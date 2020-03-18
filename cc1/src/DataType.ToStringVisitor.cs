@@ -20,7 +20,7 @@ namespace AnsiCParser {
                 _visited.Add(self);
                 string str;
                 switch (self.Kind) {
-                    case BasicType.TypeKind.KAndRImplicitInt:
+                    case BasicType.TypeKind.__KAndRImplicitInt:
                         str = "int";
                         break;
                     case BasicType.TypeKind.Void:

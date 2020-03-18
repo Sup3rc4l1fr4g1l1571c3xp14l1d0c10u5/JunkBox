@@ -469,7 +469,7 @@ namespace AnsiCParser.SyntaxTree {
                             switch (kind) {
                                 case BasicType.TypeKind.Void:
                                     throw new CompilerException.InternalErrorException(it.Current.LocationRange, "void型フィールドを初期化しようとしています。（本処理系の不具合です。）");
-                                case BasicType.TypeKind.KAndRImplicitInt:
+                                case BasicType.TypeKind.__KAndRImplicitInt:
                                 case BasicType.TypeKind.Char:
                                 case BasicType.TypeKind.SignedChar:
                                 case BasicType.TypeKind.UnsignedChar:

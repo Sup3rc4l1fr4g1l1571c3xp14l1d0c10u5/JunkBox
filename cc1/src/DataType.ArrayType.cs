@@ -66,7 +66,7 @@ namespace AnsiCParser {
             }
 
             /// <summary>
-            ///     型の境界調整（アラインメント）を取得
+            /// 型の境界調整（アラインメント）を取得
             /// </summary>
             /// <returns></returns>
             public override int AlignOf() {

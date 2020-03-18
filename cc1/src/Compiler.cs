@@ -2456,7 +2456,7 @@ namespace AnsiCParser {
             }
 
             /// <summary>
-            ///     整数値もしくはポインタ値を指定した32ビットレジスタにロードする。レジスタに入らないサイズはエラーになる
+            /// 整数値もしくはポインタ値を指定した32ビットレジスタにロードする。レジスタに入らないサイズはエラーになる
             /// </summary>
             /// <param name="register"></param>
             /// <returns></returns>
@@ -2748,7 +2748,7 @@ namespace AnsiCParser {
             }
 
             /// <summary>
-            ///     整数値もしくはポインタ値を指定した32ビットレジスタ二つを使う64bit値としてロードする。レジスタに入らないサイズはエラーになる
+            /// 整数値もしくはポインタ値を指定した32ビットレジスタ二つを使う64bit値としてロードする。レジスタに入らないサイズはエラーになる
             /// </summary>
             /// <param name="regLo"></param>
             /// <param name="regHi"></param>
@@ -3071,7 +3071,7 @@ namespace AnsiCParser {
                 }
             }
             /// <summary>
-            ///     FPUスタック上に+0.0をロードする
+            /// FPUスタック上に+0.0をロードする
             /// </summary>
             private void FpuPushZero() {
                 Emit("fldz");
@@ -3080,7 +3080,7 @@ namespace AnsiCParser {
                 Emit("fld1");
             }
             /// <summary>
-            ///     FPUスタック上に値をロードする
+            /// FPUスタック上に値をロードする
             /// </summary>
             private void FpuPush() {
                 var rhs = Peek(0);
@@ -3146,7 +3146,7 @@ namespace AnsiCParser {
             }
 
             /// <summary>
-            ///     FPUスタックの一番上の値をポップし、CPUスタックの一番上に積む
+            /// FPUスタックの一番上の値をポップし、CPUスタックの一番上に積む
             /// </summary>
             /// <param name="ty"></param>
             public void FpuPop(CType ty) {
@@ -3175,7 +3175,7 @@ namespace AnsiCParser {
                 }
             }
             /// <summary>
-            ///     FPUスタックの一番上の値を捨てる
+            /// FPUスタックの一番上の値を捨てる
             /// </summary>
             /// <param name="ty"></param>
             public void FpuDiscard() {
@@ -3183,7 +3183,7 @@ namespace AnsiCParser {
             }
 
             /// <summary>
-            ///     ポインタをロード
+            /// ポインタをロード
             /// </summary>
             /// <param name="reg"></param>
             public void LoadPointer(string reg) {
@@ -3218,7 +3218,7 @@ namespace AnsiCParser {
             }
 
             /// <summary>
-            ///     左辺値変数のアドレスをロード
+            /// 左辺値変数のアドレスをロード
             /// </summary>
             /// <param name="reg"></param>
             public void LoadVariableAddress(string reg) {
@@ -3241,7 +3241,7 @@ namespace AnsiCParser {
             }
 
             /// <summary>
-            ///     値をスタックトップに積む。もともとスタックトップにある場合は何もしない
+            /// 値をスタックトップに積む。もともとスタックトップにある場合は何もしない
             /// </summary>
             /// <param name="type"></param>
             /// <returns></returns>

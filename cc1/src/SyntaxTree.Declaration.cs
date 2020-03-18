@@ -81,7 +81,7 @@ namespace AnsiCParser.SyntaxTree {
             public FunctionDeclaration(LocationRange locationRange, string ident, CType type, StorageClassSpecifier storageClass, FunctionSpecifier functionSpecifier) : base(locationRange, ident, type, storageClass) {
                 Body = null;
                 FunctionSpecifier = functionSpecifier;
-                LinkageObject = new LinkageObject(ident, type, LinkageKind.None);
+                LinkageObject = LinkageObject.Create(this, LinkageKind.None);
             }
         }
 
@@ -108,7 +108,7 @@ namespace AnsiCParser.SyntaxTree {
             /// <param name="init"></param>
             public VariableDeclaration(LocationRange locationRange, string ident, CType type, StorageClassSpecifier storageClass/*, Initializer init*/) : base(locationRange, ident, type, storageClass) {
                 Init = null;//init;
-                LinkageObject = new LinkageObject(ident, type, LinkageKind.None);
+                LinkageObject = LinkageObject.Create(this, LinkageKind.None);
             }
         }
 
@@ -127,7 +127,7 @@ namespace AnsiCParser.SyntaxTree {
             /// <param name="storageClass"></param>
             public ArgumentDeclaration(LocationRange locationRange, string ident, CType type, StorageClassSpecifier storageClass)
                 : base(locationRange, ident, type, storageClass) {
-                LinkageObject = new LinkageObject(ident, type, LinkageKind.NoLinkage);
+                LinkageObject = LinkageObject.Create(this, LinkageKind.NoLinkage);
             }
         }
 
@@ -143,18 +143,18 @@ namespace AnsiCParser.SyntaxTree {
             /// <param name="ident"></param>
             /// <param name="type"></param>
             public TypeDeclaration(LocationRange locationRange, string ident, CType type) : base(locationRange, ident, type, StorageClassSpecifier.None) {
-                LinkageObject = new LinkageObject(ident, type, LinkageKind.NoLinkage);
+                LinkageObject = LinkageObject.Create(this, LinkageKind.NoLinkage);
             }
         }
 
         /// <inheritdoc />
         /// <summary>
-        ///     列挙型のメンバ宣言（便宜上ここに挿入）
+        /// 列挙型のメンバ宣言（便宜上ここに挿入）
         /// </summary>
         /// <remarks>
-        ///     6.4.4.3 列挙定数
-        ///     意味規則
-        ///     列挙定数として宣言された識別子は，型 int をもつ。
+        /// 6.4.4.3 列挙定数
+        /// 意味規則
+        /// 列挙定数として宣言された識別子は，型 int をもつ。
         /// </remarks>
         public class EnumMemberDeclaration : Declaration {
             /// <summary>
@@ -164,7 +164,7 @@ namespace AnsiCParser.SyntaxTree {
             /// <param name="mi"></param>
             public EnumMemberDeclaration(LocationRange locationRange, TaggedType.EnumType.MemberInfo mi) : base(locationRange, mi.Ident.Raw, CType.CreateSignedInt(), StorageClassSpecifier.None) {
                 MemberInfo = mi;
-                LinkageObject = new LinkageObject(mi.Ident.Raw, CType.CreateSignedInt(), LinkageKind.NoLinkage);
+                LinkageObject = LinkageObject.Create(this, LinkageKind.NoLinkage);
             }
 
             /// <summary>

@@ -6,42 +6,41 @@ namespace AnsiCParser {
 
     namespace DataType {
         /// <summary>
-        ///     基本型
+        /// 基本型
         /// </summary>
         /// <remarks>
-        ///     6.7.2 型指定子
-        ///     制約
-        ///     それぞれの宣言の宣言指定子列の中で，又はそれぞれの構造体宣言及び型名の型指定子型修飾子並びの中で，少なくとも一つの型指定子を指定しなければならない。型指定子の並びは，次に示すもののいずれか一つでなければならない.
-        ///     - void
-        ///     - char
-        ///     - signed char
-        ///     - unsigned char
-        ///     - short，signed short，short int，signed short int
-        ///     - unsigned short，unsigned short int
-        ///     - int，signed，signed int
-        ///     - unsigned，unsigned int
-        ///     - long，signed long，long int，signed long int
-        ///     - unsigned long，unsigned long int
-        ///     - long long，signed long long，long long int，signed long long int
-        ///     - unsigned long long，unsigned long long int
-        ///     - float
-        ///     - double
-        ///     - long double
-        ///     - _Bool
-        ///     - float _Complex
-        ///     - double _Complex
-        ///     - long double _Complex
-        ///     - float _Imaginary
-        ///     - double _Imaginary
-        ///     - long double _Imaginary
-        ///     - 構造体共用体指定子
-        ///     - 列挙型指定子
-        ///     - 型定義名
+        /// 6.7.2 型指定子
+        /// 制約
+        /// それぞれの宣言の宣言指定子列の中で，又はそれぞれの構造体宣言及び型名の型指定子型修飾子並びの中で，少なくとも一つの型指定子を指定しなければならない。型指定子の並びは，次に示すもののいずれか一つでなければならない.
+        /// - void
+        /// - char
+        /// - signed char
+        /// - unsigned char
+        /// - short，signed short，short int，signed short int
+        /// - unsigned short，unsigned short int
+        /// - int，signed，signed int
+        /// - unsigned，unsigned int
+        /// - long，signed long，long int，signed long int
+        /// - unsigned long，unsigned long int
+        /// - long long，signed long long，long long int，signed long long int
+        /// - unsigned long long，unsigned long long int
+        /// - float
+        /// - double
+        /// - long double
+        /// - _Bool
+        /// - float _Complex
+        /// - double _Complex
+        /// - long double _Complex
+        /// - float _Imaginary
+        /// - double _Imaginary
+        /// - long double _Imaginary
+        /// - 構造体共用体指定子
+        /// - 列挙型指定子
+        /// - 型定義名
         /// </remarks>
         public class BasicType : CType {
 
             public enum TypeKind : byte {
-                KAndRImplicitInt,
                 Void,
                 Char,
                 SignedChar,
@@ -52,18 +51,28 @@ namespace AnsiCParser {
                 UnsignedInt,
                 SignedLongInt,
                 UnsignedLongInt,
-                SignedLongLongInt,
-                UnsignedLongLongInt,
                 Float,
                 Double,
+
+                // C99
+                SignedLongLongInt,
+                UnsignedLongLongInt,
+
                 LongDouble,
+
                 _Bool,
+
                 Float_Complex,
                 Double_Complex,
                 LongDouble_Complex,
+
                 Float_Imaginary,
                 Double_Imaginary,
-                LongDouble_Imaginary
+                LongDouble_Imaginary,
+
+                // コンパイラ内部用
+                __KAndRImplicitInt,
+                __Pointer,
             }
 
             /// <summary>
@@ -104,13 +113,13 @@ namespace AnsiCParser {
             /// <param name="typeSpecifier"></param>
             /// <returns></returns>
             public static BasicType FromTypeSpecifier(TypeSpecifier typeSpecifier) {
-                return new BasicType(ToKind(typeSpecifier));
+                return Create(ToKind(typeSpecifier));
             }
 
             private static TypeKind ToKind(TypeSpecifier typeSpecifier) {
                 switch (typeSpecifier) {
                     case TypeSpecifier.None:
-                        return TypeKind.KAndRImplicitInt;
+                        return TypeKind.__KAndRImplicitInt;
                     case TypeSpecifier.Void:
                         return TypeKind.Void;
                     case TypeSpecifier.Char:
@@ -192,7 +201,7 @@ namespace AnsiCParser {
             }
 
             /// <summary>
-            ///     型の境界調整（アラインメント）を取得（ビットフィールドの場合、元の型のアラインメント）
+            /// 型の境界調整（アラインメント）を取得（ビットフィールドの場合、元の型のアラインメント）
             /// </summary>
             /// <returns></returns>
             public override int AlignOf() {
@@ -200,6 +209,8 @@ namespace AnsiCParser {
             }
 
         }
+
+
     }
 
 }

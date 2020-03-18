@@ -1,7 +1,7 @@
 namespace AnsiCParser {
     namespace DataType {
         /// <summary>
-        ///     型修飾子
+        /// 型修飾子
         /// </summary>
         public class TypeQualifierType : CType {
             public TypeQualifierType(CType type, TypeQualifier qualifier) {

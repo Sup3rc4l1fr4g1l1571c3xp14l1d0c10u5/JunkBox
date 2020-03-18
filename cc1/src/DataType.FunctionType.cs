@@ -8,7 +8,7 @@ namespace AnsiCParser {
 
     namespace DataType {
         /// <summary>
-        ///     関数型
+        /// 関数型
         /// </summary>
         public class FunctionType : CType {
             /// <summary>
@@ -33,7 +33,7 @@ namespace AnsiCParser {
                 // 関数定義の一部である関数宣言子の仮引数型並びにある仮引数は，型調整後に不完全型をもってはならない。(これは関数定義/宣言中で行う。)
                 // 
 
-                Arguments = arguments?.ToArray();
+                SetArguments(arguments?.ToArray());
                 ResultType = resultType;
                 HasVariadic = hasVariadic;
                 PrototypeTaggedScope = prototypeTaggedScope;
@@ -47,11 +47,11 @@ namespace AnsiCParser {
 
 
             /// <summary>
-            ///     引数の情報
-            ///     nullの場合、int foo(); のように識別子並びが空であることを示す。
-            ///     空の場合、int foo(void); のように唯一のvoidであることを示す。
-            ///     一つ以上の要素を持つ場合、int foo(int, double); のように引数を持つことを示す。また、引数リストにvoid型の要素は含まれない。
-            ///     仮引数宣言に記憶域クラス指定子として，register 以外のものを指定してはならない。
+            /// 引数の情報
+            /// nullの場合、int foo(); のように識別子並びが空であることを示す。
+            /// 空の場合、int foo(void); のように唯一のvoidであることを示す。
+            /// 一つ以上の要素を持つ場合、int foo(int, double); のように引数を持つことを示す。また、引数リストにvoid型の要素は含まれない。
+            /// 仮引数宣言に記憶域クラス指定子として，register 以外のものを指定してはならない。
             /// </summary>
             public ArgumentInfo[] Arguments {
                 get; private set;
@@ -94,14 +94,14 @@ namespace AnsiCParser {
             }
 
             /// <summary>
-            ///     戻り値型
+            /// 戻り値型
             /// </summary>
             public CType ResultType {
                 get; private set;
             }
 
             /// <summary>
-            ///     可変長引数の有無
+            /// 可変長引数の有無
             /// </summary>
             public bool HasVariadic {
                 get;
@@ -171,7 +171,7 @@ namespace AnsiCParser {
                     return candidate;
                 }
                 foreach (var x in Arguments) {
-                    if (x.Type.IsBasicType(BasicType.TypeKind.KAndRImplicitInt)) {
+                    if (x.Type.IsBasicType(BasicType.TypeKind.__KAndRImplicitInt)) {
                         // 型が省略されている＝識別子並びの要素
                         Debug.Assert(!String.IsNullOrEmpty(x.Ident?.Raw));
                         if (candidate == FunctionStyle.AmbiguityStyle || candidate == FunctionStyle.OldStyle) {

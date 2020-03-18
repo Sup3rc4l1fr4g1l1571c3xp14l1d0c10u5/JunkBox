@@ -46,7 +46,7 @@ namespace AnsiCParser {
                         }
                         else {
                             // 以前のオブジェクトが存在しない
-                            value = new LinkageObject(decl.Ident, decl.Type, linkage);
+                            value = LinkageObject.Create(decl, linkage);
                             _linkageTable[decl.Ident] = value;
                             LinkageObjects.Add(value);
                         }
@@ -70,15 +70,16 @@ namespace AnsiCParser {
 
                     case LinkageKind.NoLinkage: {
                         // 無結合なので再定義チェックはしない。(名前表上で再定義のチェックは終わっているはず。)
-                        var value = new LinkageObject(decl.Ident, decl.Type, linkage);
-                        // static の場合は、staticなリンケージ名を生成して使う
-                        if (decl.StorageClass == StorageClassSpecifier.Static) {
-                            value.Definition = decl;
-                            value.LinkageId = $"{decl.Ident}.{LinkageObjects.Count}";
-                            LinkageObjects.Add(value);
-                        }
 
-                        return value;
+                        // static の場合は、uniqueなリンケージ名を生成して使う
+                        if (decl.StorageClass == StorageClassSpecifier.Static) {
+                            var value = LinkageObject.CreateUnique(decl, linkage);
+                            value.Definition = decl;
+                            LinkageObjects.Add(value);
+                            return value;
+                        } else {
+                            return LinkageObject.Create(decl, linkage);
+                        }
                     }
 
                     default:

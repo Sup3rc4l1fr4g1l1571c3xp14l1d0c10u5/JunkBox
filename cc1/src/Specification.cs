@@ -744,7 +744,7 @@ namespace AnsiCParser {
         /// 通常の算術型変換（usual arithmetic conversion）
         /// </summary>
         /// <remarks>
-        ///     
+        /// 
         /// 算術型のオペランドをもつ多くの演算子は，同じ方法でオペランドの型変換を行い，結果の型を決める。型変換は，オペランドと結果の共通の実数型（common real type）を決めるために行う。
         /// 与えられたオペランドに対し，それぞれのオペランドは，型領域を変えることなく，共通の実数型を対応する実数型とする型に変換する。
         /// この規格で明示的に異なる規定を行わない限り，結果の対応する実数型も，この共通の実数型とし，その型領域は，オペランドの型領域が一致していればその型領域とし，一致していなければ複素数型とする。
@@ -1193,14 +1193,17 @@ namespace AnsiCParser {
             if (targetType != null) {
                 CType exprPointedType;
                 CType targetPointedType;
-                if (targetType.IsPointerType() && ((expr.Type.IsPointerType(out exprPointedType) && exprPointedType.IsVoidType()) || (expr.IsNullPointerConstant()))) {
-                    // void へのポインタは，任意の不完全型若しくはオブジェクト型へのポインタに，又はポインタから，型変換してもよい。
-                    // 任意の不完全型又はオブジェクト型へのポインタを，void へのポインタに型変換して再び戻した場合，結果は元のポインタと比較して等しくなければならない。
+                if (
+                    (targetType.IsPointerType() && ((expr.Type.IsPointerType(out exprPointedType) && exprPointedType.IsVoidType()) || (expr.IsNullPointerConstant()))) ||
+                    (expr.Type.IsPointerType() && ((targetType.IsPointerType(out targetPointedType) && targetPointedType.IsVoidType()) ))
+                   ) {
+                        // void へのポインタは，任意の不完全型若しくはオブジェクト型へのポインタに，又はポインタから，型変換してもよい。
+                        // 任意の不完全型又はオブジェクト型へのポインタを，void へのポインタに型変換して再び戻した場合，結果は元のポインタと比較して等しくなければならない。
 
-                    // 値0をもつ整数定数式又はその定数式を型void* にキャストした式を，空ポインタ定数（null pointer constant） と呼ぶ。
-                    // 空ポインタ定数をポインタ型に型変換した場合，その結果のポインタを空ポインタ（null pointer）と呼び，いかなるオブジェクト又は関数へのポインタと比較しても等しくないことを保証する。
-                    // 空ポインタを他のポインタ型に型変換すると，その型の空ポインタを生成する。
-                    return Expression.TypeConversionExpression.Apply(expr.LocationRange, targetType, expr);
+                        // 値0をもつ整数定数式又はその定数式を型void* にキャストした式を，空ポインタ定数（null pointer constant） と呼ぶ。
+                        // 空ポインタ定数をポインタ型に型変換した場合，その結果のポインタを空ポインタ（null pointer）と呼び，いかなるオブジェクト又は関数へのポインタと比較しても等しくないことを保証する。
+                        // 空ポインタを他のポインタ型に型変換すると，その型の空ポインタを生成する。
+                        return Expression.TypeConversionExpression.Apply(expr.LocationRange, targetType, expr);
                 }
                 if (targetType.IsPointerType(out targetPointedType) && targetPointedType.IsQualifiedType()
                     && expr.Type.IsPointerType(out exprPointedType) && !exprPointedType.IsQualifiedType()
@@ -1660,6 +1663,8 @@ namespace AnsiCParser {
                 //
                 if (t1 is FunctionType && t2 is FunctionType) {
                     if ((t1 as FunctionType).Arguments != null && (t2 as FunctionType).Arguments != null) {
+                        // 両方が仮引数型並びをもつ場合
+                        // 仮引数の個数及び省略記号の有無に関して一致
                         if ((t1 as FunctionType).HasVariadic != (t2 as FunctionType).HasVariadic) {
                             return false;
                         }
@@ -1667,6 +1672,7 @@ namespace AnsiCParser {
                             return false;
                         }
 
+                        // 対応する仮引数の型が適合する。
                         int len = (t1 as FunctionType).Arguments.Length;
                         for (var i = 0; i < len; i++) {
                             var m1 = (t1 as FunctionType).Arguments[i];
@@ -1677,38 +1683,48 @@ namespace AnsiCParser {
                                 return false;
                             }
                         }
+                        // 両方が適合する返却値の型をもつか調べる
                         t1 = (t1 as FunctionType).ResultType;
                         t2 = (t2 as FunctionType).ResultType;
                         continue;
                     } else if ((t1 as FunctionType).Arguments != null && (t2 as FunctionType).Arguments == null) {
+                        // 一方の型が仮引数型並びをもち，他方の型が関数定義の一部でない関数宣言子によって指定され，識別子並びが空の場合
+                        //   一方の型=新しい形式の関数宣言, 他方の型 = 識別子並びが空の関数宣言（引数部を省略している。つまり、古い形式の宣言）
                         // 新しい形式の関数宣言の後に古い形式の宣言が来た
 
                         // 各仮引数の型は，既定の実引数拡張を適用した結果の型と見なす
                         if ((t1 as FunctionType).Arguments.Any(x => !IsCompatible(DefaultArgumentPromotion(x.Type), x.Type))) {
                             return false;
                         }
-                        // t1側は関数は引数部に省略記号を含まないとみなす
+                        // 一方の型の仮引数型並びは省略記号を含まない
                         if ((t1 as FunctionType).HasVariadic == true) {
                             return false;
                         }
+                        // 両方が適合する返却値の型をもつか調べる
                         t1 = (t1 as FunctionType).ResultType;
                         t2 = (t2 as FunctionType).ResultType;
                         continue;
                     } else if ((t1 as FunctionType).Arguments == null && (t2 as FunctionType).Arguments != null) {
+                        // 一方の型が仮引数型並びをもち，他方の型が関数定義の一部でない関数宣言子によって指定され，識別子並びが空の場合
+                        //   一方の型=識別子並びが空の関数宣言（引数部を省略している。つまり、古い形式の宣言）, 他方の型 = 新しい形式の関数宣言
                         // 古い形式の関数宣言の後に新しい形式の宣言が来た
+
                         // 各仮引数の型は，既定の実引数拡張を適用した結果の型と見なす
                         if ((t2 as FunctionType).Arguments.Any(x => !IsCompatible(DefaultArgumentPromotion(x.Type), x.Type))) {
                             return false;
                         }
-                        // t2側は関数は引数部に省略記号を含まないとみなす
+                        // 一方の型の仮引数型並びは省略記号を含まない
                         if ((t2 as FunctionType).HasVariadic == true) {
                             return false;
                         }
+                        // 両方が適合する返却値の型をもつか調べる
                         t1 = (t1 as FunctionType).ResultType;
                         t2 = (t2 as FunctionType).ResultType;
                         continue;
                     } else if ((t1 as FunctionType).Arguments == null && (t2 as FunctionType).Arguments == null) {
                         // 古い形式（引数省略）同士なので引数については見ない。
+
+                        // 両方が適合する返却値の型をもつか調べる
                         t1 = (t1 as FunctionType).ResultType;
                         t2 = (t2 as FunctionType).ResultType;
                         continue;

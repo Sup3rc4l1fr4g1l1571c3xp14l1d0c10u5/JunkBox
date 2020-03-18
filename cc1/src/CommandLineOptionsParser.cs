@@ -13,7 +13,7 @@ namespace AnsiCParser {
         /// </summary>
         /// <param name="args">コマンドラインに渡された引数列</param>
         /// <returns>解析成功ならtrue, 解析失敗ならfalse</returns>
-        public delegate bool OptionHandler(T t, String[] args);
+        public delegate bool OptionHandler(T context, String[] args);
 
         /// <summary>
         /// 引数についての定義
@@ -135,40 +135,39 @@ namespace AnsiCParser {
         /// <summary>
         /// 引数の解析を行う
         /// </summary>
-        /// <param name="t"></param>
+        /// <param name="context">引数解析結果を入れるコンテキスト</param>
         /// <param name="args">引数列</param>
         /// <returns>余りの引数列</returns>
-        public T Parse(T t, string[] args) {
+        public T Parse(T context, string[] args) {
             using (IEnumerator<string> it = new List<string>(args).GetEnumerator()) {
 
                 while (it.MoveNext()) {
-                    var key = it.Current;
                     OptionDefinition info;
-                    if (key == null) { continue; }
-                    if (_options.TryGetValue(key, out info)) {
-                        var tmp = new List<string>();
+                    if (it.Current == null) { continue; }
+                    if (_options.TryGetValue(it.Current, out info)) {
+                        var argList = new List<string>();
                         for (int i = 0; i < info.Argc; i++) {
                             if (it.MoveNext() == false) {
-                                throw new TooFewArgumentException(info.Name, info.Argc, tmp.Count);
+                                throw new TooFewArgumentException(info.Name, info.Argc, argList.Count);
                             } else {
-                                tmp.Add(it.Current);
+                                argList.Add(it.Current);
                             }
                         }
-                        var ary = tmp.ToArray();
-                        if (info.Handler(t, ary) == false) {
-                            throw new ArgumentFormatException(info.Name, ary);
+                        var argArray = argList.ToArray();
+                        if (info.Handler(context, argArray) == false) {
+                            throw new ArgumentFormatException(info.Name, argArray);
                         }
                     } else {
-                        var s = new List<string>();
+                        var argList = new List<string>();
                         if (_default != null) {
                             do {
-                                s.Add(it.Current);
+                                argList.Add(it.Current);
                             } while (it.MoveNext());
-                            _default(t, s.ToArray());
+                            _default(context, argList.ToArray());
                         }
                     }
                 }
-                return t;
+                return context;
             }
         }
     }

@@ -1,7 +1,7 @@
 namespace AnsiCParser {
 namespace DataType {
     /// <summary>
-    ///     Typedefされた型
+    /// Typedefされた型
     /// </summary>
     public class TypedefType : CType {
         public TypedefType(Token ident, CType type) {

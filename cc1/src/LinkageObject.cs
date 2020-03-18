@@ -60,41 +60,41 @@ namespace AnsiCParser {
 
         private static int _idCnt;
 
-        public LinkageObject(string ident, CType type, LinkageKind linkage) {
+        private LinkageObject(string ident, CType type, LinkageKind linkage, bool unique = false) {
             Id = _idCnt++;
             Ident = ident;
             Type = type;
             Linkage = linkage;
-            LinkageId = (Linkage == LinkageKind.ExternalLinkage) ? $"_{ident}" : $"{ident}";
+            LinkageId = (Linkage == LinkageKind.ExternalLinkage) ? $"_{ident}" : (Linkage == LinkageKind.NoLinkage && unique) ? $"{ident}.{_idCnt}" : $"{ident}";
+        }
+
+        public static LinkageObject Create(Declaration declaration, LinkageKind linkage) {
+            return new LinkageObject(declaration.Ident, declaration.Type, linkage);
+        }
+
+        public static LinkageObject CreateUnique(Declaration definition, LinkageKind linkage) {
+            return new LinkageObject(definition.Ident, definition.Type, linkage,true);
         }
 
         /// <summary>
         /// Id
         /// </summary>
-        public int Id {
-            get;
-        }
+        public int Id { get; }
 
         /// <summary>
         /// 名前
         /// </summary>
-        public string Ident {
-            get;
-        }
+        public string Ident { get; }
 
         /// <summary>
         /// 型
         /// </summary>
-        public CType Type {
-            get; set;
-        }
+        public CType Type { get; }
 
         /// <summary>
         /// リンケージ種別
         /// </summary>
-        public LinkageKind Linkage {
-            get;
-        }
+        public LinkageKind Linkage { get; }
 
         /// <summary>
         /// 仮宣言（仮宣言は複数できる）
@@ -109,9 +109,7 @@ namespace AnsiCParser {
         /// <summary>
         /// リンケージを考慮した名前
         /// </summary>
-        public string LinkageId {
-            get;
-            set;
-        }
+        public string LinkageId { get; }
+
     }
 }

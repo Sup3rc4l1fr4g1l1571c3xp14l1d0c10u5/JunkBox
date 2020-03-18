@@ -27,8 +27,10 @@ namespace AnsiCParser {
                     //   - その値は，0 以上でなければならず，コロン及び式が省略された場合，指定された型のオブジェクトがもつビット数を超えてはならない。
                     //   - 値が 0 の場合，その宣言に宣言子があってはならない。
                     // - ビットフィールドの型は，修飾版又は非修飾版の_Bool，signed int，unsigned int 又は他の処理系定義の型でなければならない。
-                    if (!type.Unwrap().IsBasicType(BasicType.TypeKind._Bool, BasicType.TypeKind.SignedInt, BasicType.TypeKind.UnsignedInt, BasicType.TypeKind.SignedChar, BasicType.TypeKind.UnsignedChar, BasicType.TypeKind.Char, BasicType.TypeKind.SignedShortInt, BasicType.TypeKind.UnsignedShortInt, BasicType.TypeKind.SignedLongInt, BasicType.TypeKind.UnsignedLongInt, BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt)) {
-                        throw new CompilerException.SpecificationErrorException(ident.Range, "ビットフィールドの型は，修飾版又は非修飾版の_Bool，signed int，unsigned int 又は他の処理系定義の型でなければならない。(int型以外が使えるのは処理系依存の仕様)");
+                    if (!type.Unwrap().IsBasicType(BasicType.TypeKind._Bool, BasicType.TypeKind.SignedInt, BasicType.TypeKind.UnsignedInt)) { 
+                        if (!type.Unwrap().IsBasicType(BasicType.TypeKind.SignedChar, BasicType.TypeKind.UnsignedChar, BasicType.TypeKind.Char, BasicType.TypeKind.SignedShortInt, BasicType.TypeKind.UnsignedShortInt, BasicType.TypeKind.SignedLongInt, BasicType.TypeKind.UnsignedLongInt, BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt)) {
+                            throw new CompilerException.SpecificationErrorException(ident.Range, "ビットフィールドの型は，修飾版又は非修飾版の_Bool，signed int，unsigned int 又は他の処理系定義の型でなければならない。(int型以外が使えるのは処理系依存の仕様)");
+                        }
                     }
                     if (bitWidth > type.SizeOf() * 8) {
                         throw new CompilerException.SpecificationErrorException(ident.Range, "ビットフィールドの幅の値は，指定された型のオブジェクトがもつビット数を超えてはならない。");
@@ -57,7 +59,6 @@ namespace AnsiCParser {
                 get; private set;
             }
 
-
             public override void Fixup(CType type) {
                 if (Type is StubType) {
                     Type = type;
@@ -75,7 +76,7 @@ namespace AnsiCParser {
             }
 
             /// <summary>
-            ///     型の境界調整（アラインメント）を取得（ビットフィールドの場合、元の型のサイズ）
+            /// 型の境界調整（アラインメント）を取得（ビットフィールドの場合、元の型のアラインメント）
             /// </summary>
             /// <returns></returns>
             public override int AlignOf() {

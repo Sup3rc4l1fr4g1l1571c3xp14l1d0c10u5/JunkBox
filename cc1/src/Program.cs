@@ -132,7 +132,7 @@ namespace AnsiCParser {
 
         static void DebugMain(string[] args) {
             var ret = new Parser(
-                //System.IO.File.ReadAllText(@"C:\Users\0079595\Documents\Visual Studio 2015\Projects\cc1\ShivyC\feature_tests\error_array.c") /*
+                System.IO.File.ReadAllText(@"C:\Users\0079595\Documents\Visual Studio 2015\Projects\cc1\c-testsuite-master\tests\single-exec\00114.c") /*
                 @"
 enum {
     zero = '\0'

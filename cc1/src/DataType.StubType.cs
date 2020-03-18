@@ -1,7 +1,7 @@
 namespace AnsiCParser {
     namespace DataType {
         /// <summary>
-        ///     スタブ型（型の解決中でのみ用いる他の型が入る穴）
+        /// スタブ型（型の解決中でのみ用いる他の型が入る穴）
         /// </summary>
         public class StubType : CType {
 

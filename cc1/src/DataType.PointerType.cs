@@ -1,7 +1,7 @@
 namespace AnsiCParser {
     namespace DataType {
         /// <summary>
-        ///     ポインタ型
+        /// ポインタ型
         /// </summary>
         public class PointerType : CType {
             public PointerType(CType referencedType) {

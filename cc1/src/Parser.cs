@@ -883,7 +883,7 @@ namespace AnsiCParser {
             foreach (var scopeValue in _labelScope) {
                 if (scopeValue.Item2.Declaration == null && scopeValue.Item2.References.Any()) {
                     // 未定義のラベルが使われている。
-                    scopeValue.Item2.References.ForEach(x => throw new CompilerException.SpecificationErrorException(x.LocationRange, $"未定義のラベル {x.Label} が使用されています。"));
+                    scopeValue.Item2.References.ForEach(x => { throw new CompilerException.SpecificationErrorException(x.LocationRange, $"未定義のラベル {x.Label} が使用されています。"); });
                 }
                 if (scopeValue.Item2.Declaration != null && !scopeValue.Item2.References.Any()) {
                     // 未参照のラベルが使われている。

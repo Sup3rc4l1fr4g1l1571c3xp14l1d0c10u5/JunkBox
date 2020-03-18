@@ -6,11 +6,11 @@ using static AnsiCParser.DataType.CType.UnwrapFlag;
 namespace AnsiCParser {
     namespace DataType {
         /// <summary>
-        ///     C言語の型を表現
+        /// C言語の型を表現
         /// </summary>
         public abstract class CType {
             /// <summary>
-            ///     型指定を解決する
+            /// 型指定を解決する
             /// </summary>
             /// <param name="baseType"></param>
             /// <param name="stack"></param>
@@ -19,8 +19,7 @@ namespace AnsiCParser {
                 return stack.Aggregate(baseType, (s, x) => {
                     if (x is StubType) {
                         return s;
-                    }
-                    else {
+                    } else {
                         x.Fixup(s);
                         return x;
                     }
@@ -28,7 +27,7 @@ namespace AnsiCParser {
             }
 
             /// <summary>
-            ///     StubTypeをtypeで置き換える。
+            /// StubTypeをtypeで置き換える。
             /// </summary>
             /// <param name="type"></param>
             public virtual void Fixup(CType type) {
@@ -50,26 +49,26 @@ namespace AnsiCParser {
             public abstract CType Duplicate();
 
             /// <summary>
-            ///     型のサイズを取得（ビットフィールドの場合、元の型のサイズ）
+            /// 型のサイズを取得（ビットフィールドの場合、元の型のサイズ）
             /// </summary>
             /// <returns></returns>
             public abstract int SizeOf();
 
             /// <summary>
-            ///     型の境界調整（アラインメント）を取得（ビットフィールドの場合、元の型のアラインメント）
+            /// 型の境界調整（アラインメント）を取得（ビットフィールドの場合、元の型のアラインメント）
             /// </summary>
             /// <returns></returns>
             public abstract int AlignOf();
 
             /// <summary>
-            ///     型が同一であるかどうかを比較する(適合ではない。)
+            /// 型が同一であるかどうかを比較する(適合ではない。)
             /// </summary>
             /// <param name="t1"></param>
             /// <param name="t2"></param>
             /// <returns></returns>
             public static bool IsEqual(CType t1, CType t2) {
                 for (;;) {
-                    
+
                     /* 同一なので真 */
                     if (ReferenceEquals(t1, t2)) { return true; }
 
@@ -102,7 +101,7 @@ namespace AnsiCParser {
                     if (t1 is TypeQualifierType && t2 is TypeQualifierType) {
                         var tqt1 = (TypeQualifierType)t1;
                         var tqt2 = (TypeQualifierType)t2;
-                        /* 型修飾が違うので疑 */
+                        /* 型修飾が違うので偽 */
                         if (tqt1.Qualifier != tqt2.Qualifier) {
                             return false;
                         }
@@ -125,7 +124,7 @@ namespace AnsiCParser {
                     if (t1 is BitFieldType && t2 is BitFieldType) {
                         var bft1 = (BitFieldType)t1;
                         var bft2 = (BitFieldType)t2;
-                        /* ビットフィールドの先頭位置とビット幅が一致しないなら疑 */
+                        /* ビットフィールドの先頭位置とビット幅が一致しないなら偽 */
                         if (bft1.BitOffset != bft2.BitOffset) {
                             return false;
                         }
@@ -142,7 +141,7 @@ namespace AnsiCParser {
                     if (t1 is ArrayType && t2 is ArrayType) {
                         var at1 = (ArrayType)t1;
                         var at2 = (ArrayType)t2;
-                        /* 配列の要素数が一致しないなら疑 */
+                        /* 配列の要素数が一致しないなら偽 */
                         if (at1.Length != at2.Length) {
                             return false;
                         }
@@ -157,17 +156,17 @@ namespace AnsiCParser {
                         var ft1 = (FunctionType)t1;
                         var ft2 = (FunctionType)t2;
 
-                        /* 引数の存在及び数が一致しないなら疑 */
+                        /* 引数の存在及び数が一致しないなら偽 */
                         if (ft1.Arguments?.Length != ft2.Arguments?.Length) {
                             return false;
                         }
 
-                        /* 可変長引数の有無が一致しないなら疑 */
+                        /* 可変長引数の有無が一致しないなら偽 */
                         if (ft1.HasVariadic != ft2.HasVariadic) {
                             return false;
                         }
 
-                        /* 引数それぞれの型が一致しないなら疑 */
+                        /* 引数それぞれの型が一致しないなら偽 */
                         if (ft1.Arguments != null && ft2.Arguments != null) {
                             if (ft1.Arguments.Zip(ft2.Arguments, (x, y) => IsEqual(x.Type, y.Type)).All(x => x) == false) {
                                 return false;
@@ -190,27 +189,27 @@ namespace AnsiCParser {
                         var sut1 = (TaggedType.StructUnionType)t1;
                         var sut2 = (TaggedType.StructUnionType)t2;
 
-                        /* 種別が一致しないなら疑 */
+                        /* 種別が一致しないなら偽 */
                         if (sut1.Kind != sut2.Kind) {
                             return false;
                         }
 
-                        /* 匿名型かどうかが一致しないなら疑 */
+                        /* 匿名型かどうかが一致しないなら偽 */
                         if (sut1.IsAnonymous != sut2.IsAnonymous) {
                             return false;
                         }
 
-                        /* タグ名が一致しないなら疑 */
+                        /* タグ名が一致しないなら偽 */
                         if (sut1.TagName != sut2.TagName) {
                             return false;
                         }
 
-                        /* メンバの要素数が一致しないなら疑 */
+                        /* メンバの要素数が一致しないなら偽 */
                         if (sut1.Members.Count != sut2.Members.Count) {
                             return false;
                         }
 
-                        /* メンバそれぞれの型が一致しないなら疑 */
+                        /* メンバそれぞれの型が一致しないなら偽 */
                         if (sut1.Members.Zip(sut2.Members, (x, y) => IsEqual(x.Type, y.Type)).All(x => x) == false) {
                             return false;
                         }
@@ -220,7 +219,7 @@ namespace AnsiCParser {
 
                     /* 互いが基本型の場合 */
                     if (t1 is BasicType && t2 is BasicType) {
-                        /* 種別が一致しないなら疑 */
+                        /* 種別が一致しないなら偽 */
                         if (((BasicType)t1).Kind != ((BasicType)t2).Kind) {
                             return false;
                         } else {
@@ -250,7 +249,7 @@ namespace AnsiCParser {
             }
 
             public static BasicType CreateKAndRImplicitInt() {
-                return BasicType.Create(BasicType.TypeKind.KAndRImplicitInt);
+                return BasicType.Create(BasicType.TypeKind.__KAndRImplicitInt);
             }
 
             public static BasicType CreateUnsignedInt() {
@@ -302,7 +301,7 @@ namespace AnsiCParser {
                 return BasicType.Create(BasicType.TypeKind._Bool);
             }
 
-            public static BasicType CreateSizeT() { 
+            public static BasicType CreateSizeT() {
                 return BasicType.Create(BasicType.TypeKind.UnsignedLongInt);
             }
 
@@ -311,19 +310,19 @@ namespace AnsiCParser {
             }
 
             /// <summary>
-            ///     型修飾を得る
+            /// 型修飾を得る
             /// </summary>
             /// <returns></returns>
             public TypeQualifier GetTypeQualifier() {
                 if (this is TypeQualifierType) {
-                    return ((TypeQualifierType) this).Qualifier;
+                    return ((TypeQualifierType)this).Qualifier;
                 }
 
                 return TypeQualifier.None;
             }
 
             /// <summary>
-            ///     型修飾を追加する
+            /// 型修飾を追加する
             /// </summary>
             /// <returns></returns>
             public CType WrapTypeQualifier(TypeQualifier typeQualifier) {
@@ -339,8 +338,7 @@ namespace AnsiCParser {
                         // - const int A[15][24] -> (const int [15])[24]や (const int [15][24])ではなく、 const intの配列
                         var tq = elementType.GetTypeQualifier();
                         return new ArrayType(len, elementType.WrapTypeQualifier(tq | typeQualifier));
-                    }
-                    else {
+                    } else {
                         return new TypeQualifierType(UnwrapTypeQualifier(), GetTypeQualifier() | typeQualifier);
                     }
                 }
@@ -349,7 +347,7 @@ namespace AnsiCParser {
             }
 
             /// <summary>
-            ///     型修飾を除去する
+            /// 型修飾を除去する
             /// </summary>
             /// <returns></returns>
             public CType UnwrapTypeQualifier() {
@@ -362,7 +360,7 @@ namespace AnsiCParser {
             }
 
             /// <summary>
-            ///     void型ならば真
+            /// void型ならば真
             /// </summary>
             /// <returns></returns>
             public bool IsVoidType() {
@@ -371,7 +369,7 @@ namespace AnsiCParser {
             }
 
             /// <summary>
-            ///     Bool型ならば真
+            /// Bool型ならば真
             /// </summary>
             /// <returns></returns>
             public bool IsBoolType() {
@@ -380,7 +378,7 @@ namespace AnsiCParser {
             }
 
             /// <summary>
-            ///     指定した種別の基本型なら真
+            /// 指定した種別の基本型なら真
             /// </summary>
             /// <param name="kind"></param>
             /// <returns></returns>
@@ -390,15 +388,13 @@ namespace AnsiCParser {
                     if (unwrappedSelf is BasicType) {
                         var targetKind = ((BasicType)unwrappedSelf).Kind;
                         foreach (var k in kind) {
-                            if (k == targetKind)
-                            {
+                            if (k == targetKind) {
                                 return true;
                             }
                         }
                     }
                     return false;
-                }
-                else {
+                } else {
                     return unwrappedSelf is BasicType;
                 }
             }
@@ -420,8 +416,7 @@ namespace AnsiCParser {
                 if (this is BitFieldType) {
                     bft = (this as BitFieldType);
                     return true;
-                }
-                else {
+                } else {
                     bft = null;
                     return false;
                 }
@@ -433,11 +428,11 @@ namespace AnsiCParser {
                 TypedefType = 0x01,
                 TypeQualifierType = 0x02,
                 BitFieldType = 0x04,
-                All = TypedefType | TypeQualifierType | BitFieldType 
+                All = TypedefType | TypeQualifierType | BitFieldType
             }
 
             /// <summary>
-            ///     型別名と型修飾（とビットフィールド修飾）を無視した型を得る。
+            /// 型別名と型修飾（とビットフィールド修飾）を無視した型を得る。
             /// </summary>
             /// <returns></returns>
             public CType Unwrap(UnwrapFlag unwrapFlag = All) {
@@ -464,6 +459,59 @@ namespace AnsiCParser {
                 return self;
             }
 
+            public struct TypeInfo {
+
+                public TypeInfo(BasicType.TypeKind Kind, int Size, int Align) : this() {
+                    this.Kind = Kind;
+                    this.Size = Size;
+                    this.Align = Align;
+                }
+
+                public BasicType.TypeKind Kind { get; }
+                public int Size { get; }
+                public int Align { get; }
+
+            }
+
+            public static readonly List<TypeInfo> TypeInfoEntry;
+
+            public static readonly Dictionary<BasicType.TypeKind, TypeInfo> TypeInfoTable;
+
+            static CType() {
+                TypeInfoEntry = new List<TypeInfo> {
+                    //new TypeInfo(Kind:BasicType.TypeKind.__KAndRImplicitInt,Size:4,Align:4),
+                    new TypeInfo(Kind:BasicType.TypeKind.Void,Size:-1,Align:1),
+                    new TypeInfo(Kind:BasicType.TypeKind.SignedChar,Size:1,Align:1),
+                    new TypeInfo(Kind:BasicType.TypeKind.UnsignedChar,Size:1,Align:1),
+                    new TypeInfo(Kind:BasicType.TypeKind.SignedShortInt,Size:2,Align:2),
+                    new TypeInfo(Kind:BasicType.TypeKind.UnsignedShortInt,Size:2,Align:2),
+                    new TypeInfo(Kind:BasicType.TypeKind.SignedInt,Size:4,Align:4),
+                    new TypeInfo(Kind:BasicType.TypeKind.UnsignedInt,Size:4,Align:4),
+                    new TypeInfo(Kind:BasicType.TypeKind.SignedLongInt,Size:4,Align:4),
+                    new TypeInfo(Kind:BasicType.TypeKind.UnsignedLongInt,Size:4,Align:4),
+                    new TypeInfo(Kind:BasicType.TypeKind.SignedLongLongInt,Size:8,Align:8),
+                    new TypeInfo(Kind:BasicType.TypeKind.UnsignedLongLongInt,Size:8,Align:8),
+                    new TypeInfo(Kind:BasicType.TypeKind.Float,Size:4,Align:4),
+                    new TypeInfo(Kind:BasicType.TypeKind.Double,Size:8,Align:8),
+                    new TypeInfo(Kind:BasicType.TypeKind.LongDouble,Size:16,Align:8),
+                    new TypeInfo(Kind:BasicType.TypeKind._Bool,Size:1,Align:1),
+                    new TypeInfo(Kind:BasicType.TypeKind.Float_Complex,Size:8,Align:4),
+                    new TypeInfo(Kind:BasicType.TypeKind.Double_Complex,Size:16,Align:8),
+                    new TypeInfo(Kind:BasicType.TypeKind.LongDouble_Complex,Size:32,Align:8),
+                    new TypeInfo(Kind:BasicType.TypeKind.Float_Imaginary,Size:8,Align:4),
+                    new TypeInfo(Kind:BasicType.TypeKind.Double_Imaginary,Size:16,Align:8),
+                    new TypeInfo(Kind:BasicType.TypeKind.LongDouble_Imaginary,Size:32,Align:8),
+                    new TypeInfo(Kind:BasicType.TypeKind.__Pointer,Size:4,Align:4),
+                };
+                TypeInfoTable = TypeInfoEntry.ToDictionary(x => x.Kind, x => x);
+
+                // K&Rの暗黙的Int型はSignedIntを元に作成
+                TypeInfoTable[BasicType.TypeKind.__KAndRImplicitInt] = TypeInfoTable[BasicType.TypeKind.SignedInt];
+                // charはSingedCharにする
+                TypeInfoTable[BasicType.TypeKind.Char] = TypeInfoTable[BasicType.TypeKind.SignedChar];
+            }
+
+
             /// <summary>
             /// 基本型のサイズ取得
             /// </summary>
@@ -471,7 +519,7 @@ namespace AnsiCParser {
             /// <returns></returns>
             public static int SizeOf(BasicType.TypeKind kind) {
                 switch (kind) {
-                    case BasicType.TypeKind.KAndRImplicitInt:
+                    case BasicType.TypeKind.__KAndRImplicitInt:
                         return 4;
                     case BasicType.TypeKind.Void:
                         throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "void型に対してsizeof演算子は適用できません。使いたければgccを使え。");
@@ -529,7 +577,7 @@ namespace AnsiCParser {
             /// <returns></returns>
             public static int AlignOf(BasicType.TypeKind kind) {
                 switch (kind) {
-                    case BasicType.TypeKind.KAndRImplicitInt:
+                    case BasicType.TypeKind.__KAndRImplicitInt:
                         return 4;
                     case BasicType.TypeKind.Void:
                         throw new CompilerException.SpecificationErrorException(Location.Empty, Location.Empty, "void型のアラインメントは取得できません。");
@@ -566,15 +614,15 @@ namespace AnsiCParser {
                     case BasicType.TypeKind.Float_Complex:
                         return 4;
                     case BasicType.TypeKind.Double_Complex:
-                        return 4;
+                        return 8;
                     case BasicType.TypeKind.LongDouble_Complex:
-                        return 4;
+                        return 8;
                     case BasicType.TypeKind.Float_Imaginary:
                         return 4;
                     case BasicType.TypeKind.Double_Imaginary:
-                        return 4;
+                        return 8;
                     case BasicType.TypeKind.LongDouble_Imaginary:
-                        return 4;
+                        return 8;
                     default:
                         throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "型のアラインメントを取得しようとしましたが、取得に失敗しました。（本実装の誤りだと思います。）");
                 }
@@ -617,8 +665,7 @@ namespace AnsiCParser {
                         var arrayType = ret as ArrayType;
 
                         return new ArrayType(arrayType.Length, arrayType.ElementType.WrapTypeQualifier(ta1.Qualifier));
-                    }
-                    else {
+                    } else {
                         return new TypeQualifierType(ret, ta1.Qualifier);
                     }
                 }
@@ -722,8 +769,7 @@ namespace AnsiCParser {
                         }
 
                         return CreateArray(len, ret);
-                    }
-                    else if (ta1.Length == ta2.Length) {
+                    } else if (ta1.Length == ta2.Length) {
                         var ret = CompositeType(ta1.ElementType, ta2.ElementType);
                         if (ret == null) {
                             return null;
@@ -757,8 +803,7 @@ namespace AnsiCParser {
                         }
 
                         return new FunctionType(arguments, ta1.HasVariadic, retType);
-                    }
-                    else if (ta1.Arguments != null && ta2.Arguments != null) {
+                    } else if (ta1.Arguments != null && ta2.Arguments != null) {
                         // 両方が仮引数型並びをもつ場合，仮引数の個数及び省略記号の有無に関して一致し，対応する仮引数の型が適合する。
 
                         // 仮引数の個数が一致？
@@ -774,7 +819,7 @@ namespace AnsiCParser {
                         // 対応する仮引数の型が適合する?
                         var newArguments = new List<FunctionType.ArgumentInfo>();
                         for (var i = 0; i < ta1.Arguments.Length; i++) {
-                        //　
+                            //　
                             var pt1 = ta1.Arguments[i].Type;
                             var pt2 = ta2.Arguments[i].Type;
                             var newArgument = CompositeType(pt1, pt2);
@@ -797,8 +842,7 @@ namespace AnsiCParser {
                         }
 
                         return new FunctionType(newArguments, ta1.HasVariadic, retType);
-                    }
-                    else if (ta1.Arguments == null && ta2.Arguments == null) {
+                    } else if (ta1.Arguments == null && ta2.Arguments == null) {
                         // 両方仮引数が無いなら仮引数を持たない合成型とする
                         var retType = CompositeType(ta1.ResultType, ta2.ResultType);
                         if (retType == null) {
@@ -874,7 +918,7 @@ namespace AnsiCParser {
                         continue;
                     }
 
-                    if (t1.IsBasicType(BasicType.TypeKind.KAndRImplicitInt)) {
+                    if (t1.IsBasicType(BasicType.TypeKind.__KAndRImplicitInt)) {
                         return true;
                     }
 
