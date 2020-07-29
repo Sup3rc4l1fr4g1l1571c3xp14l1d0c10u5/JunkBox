@@ -5043,111 +5043,123 @@ namespace AnsiCParser {
             public Value OnSimpleInitializer(Initializer.SimpleInitializer self, Value value) {
                 throw new Exception("来ないはず");
             }
-
-            public Value OnSimpleAssignInitializer(Initializer.SimpleAssignInitializer self, Value value) {
-                self.Expr.Accept(this, value);
-                _context.Push(value);
-                _context.Assign(self.Type);
-                _context.Discard();
+            public Value OnConcreteInitializer(Initializer.ConcreteInitializer self, Value value) {
+                foreach (var commands in self.InitializeCommands) {
+                    var r = PathResolver.ResolvePath(commands.path);
+                    var v = new Value(value) { Type = r.Item1 };
+                    v.Offset += r.Item2;
+                    commands.expr.Accept(this, v);
+                }
                 return value;
+                //throw new NotImplementedException("self.InitializeCommands を解析して初期化を行う処理を挿入");
             }
 
-            public Value OnArrayAssignInitializer(Initializer.ArrayAssignInitializer self, Value value) {
-                var elementSize = self.Type.ElementType.SizeOf();
-                var v = new Value(value) { Type = self.Type.ElementType };
-                var writed = 0;
-                foreach (var init in self.Inits) {
-                    init.Accept(this, v);
-                    switch (v.Kind) {
-                        case Value.ValueKind.Var:
-                            if (v.Label == null) {
-                                v.Offset += elementSize;
-                                writed += elementSize;
-                            } else {
-                                throw new NotImplementedException();
-                            }
 
-                            break;
-                        default:
-                            throw new NotImplementedException();
-                    }
-                }
 
-                while (self.Type.SizeOf() > writed) {
-                    var sz = Math.Min((self.Type.SizeOf() - writed), 4);
-                    switch (sz) {
-                        case 4:
-                            _context.Push(new Value() { IntConst = 0, Kind = Value.ValueKind.IntConst, Type = CType.CreateUnsignedInt() });
-                            _context.Push(v);
-                            _context.Assign(CType.CreateUnsignedInt());
-                            _context.Discard();
-                            break;
-                        case 3:
-                        case 2:
-                            _context.Push(new Value() { IntConst = 0, Kind = Value.ValueKind.IntConst, Type = CType.CreateUnsignedShortInt() });
-                            _context.Push(v);
-                            _context.Assign(CType.CreateUnsignedShortInt());
-                            _context.Discard();
-                            break;
-                        case 1:
-                            _context.Push(new Value() { IntConst = 0, Kind = Value.ValueKind.IntConst, Type = CType.CreateUnsignedChar() });
-                            _context.Push(v);
-                            _context.Assign(CType.CreateUnsignedChar());
-                            _context.Discard();
-                            break;
-                    }
-                    v.Offset += sz;
-                    writed += sz;
-                }
+            //public Value OnSimpleAssignInitializer(Initializer.SimpleAssignInitializer self, Value value) {
+            //    self.Expr.Accept(this, value);
+            //    _context.Push(value);
+            //    _context.Assign(self.Type);
+            //    _context.Discard();
+            //    return value;
+            //}
 
-                return new Value { Kind = Value.ValueKind.Void };
-            }
+            //public Value OnArrayAssignInitializer(Initializer.ArrayAssignInitializer self, Value value) {
+            //    var elementSize = self.Type.ElementType.SizeOf();
+            //    var v = new Value(value) { Type = self.Type.ElementType };
+            //    var writed = 0;
+            //    foreach (var init in self.Inits) {
+            //        init.Accept(this, v);
+            //        switch (v.Kind) {
+            //            case Value.ValueKind.Var:
+            //                if (v.Label == null) {
+            //                    v.Offset += elementSize;
+            //                    writed += elementSize;
+            //                } else {
+            //                    throw new NotImplementedException();
+            //                }
 
-            public Value OnStructUnionAssignInitializer(Initializer.StructUnionAssignInitializer self, Value value) {
-                // value に初期化先変数位置が入っているので戦闘から順にvalueを適切に設定して再帰呼び出しすればいい。
-                // 共用体は初期化式が一つのはず
-                Value v = new Value(value);
-                var baseoffset = v.Offset;
-                var writed = 0;
-                foreach (var member in self.Type.Members.Zip(self.Inits, Tuple.Create)) {
-                    v.Offset = baseoffset + member.Item1.Offset;
-                    member.Item2.Accept(this, v);
-                    BitFieldType bft;
-                    if (member.Item1.Type.IsBitField(out bft)) {
-                        writed = member.Item1.Offset + (bft.BitOffset + bft.BitWidth + 7) / 8;
-                    } else {
-                        writed = member.Item1.Offset + member.Item1.Type.SizeOf();
-                    }
-                }
-                v.Offset = baseoffset + writed;
-                while (self.Type.SizeOf() > writed) {
-                    var sz = Math.Min((self.Type.SizeOf() - writed), 4);
-                    switch (sz) {
-                        case 4:
-                            _context.Push(new Value() { IntConst = 0, Kind = Value.ValueKind.IntConst, Type = CType.CreateUnsignedInt() });
-                            _context.Push(v);
-                            _context.Assign(CType.CreateUnsignedInt());
-                            _context.Discard();
-                            break;
-                        case 3:
-                        case 2:
-                            _context.Push(new Value() { IntConst = 0, Kind = Value.ValueKind.IntConst, Type = CType.CreateUnsignedShortInt() });
-                            _context.Push(v);
-                            _context.Assign(CType.CreateUnsignedShortInt());
-                            _context.Discard();
-                            break;
-                        case 1:
-                            _context.Push(new Value() { IntConst = 0, Kind = Value.ValueKind.IntConst, Type = CType.CreateUnsignedChar() });
-                            _context.Push(v);
-                            _context.Assign(CType.CreateUnsignedChar());
-                            _context.Discard();
-                            break;
-                    }
-                    v.Offset += sz;
-                    writed += sz;
-                }
-                return new Value { Kind = Value.ValueKind.Void };
-            }
+            //                break;
+            //            default:
+            //                throw new NotImplementedException();
+            //        }
+            //    }
+
+            //    while (self.Type.SizeOf() > writed) {
+            //        var sz = Math.Min((self.Type.SizeOf() - writed), 4);
+            //        switch (sz) {
+            //            case 4:
+            //                _context.Push(new Value() { IntConst = 0, Kind = Value.ValueKind.IntConst, Type = CType.CreateUnsignedInt() });
+            //                _context.Push(v);
+            //                _context.Assign(CType.CreateUnsignedInt());
+            //                _context.Discard();
+            //                break;
+            //            case 3:
+            //            case 2:
+            //                _context.Push(new Value() { IntConst = 0, Kind = Value.ValueKind.IntConst, Type = CType.CreateUnsignedShortInt() });
+            //                _context.Push(v);
+            //                _context.Assign(CType.CreateUnsignedShortInt());
+            //                _context.Discard();
+            //                break;
+            //            case 1:
+            //                _context.Push(new Value() { IntConst = 0, Kind = Value.ValueKind.IntConst, Type = CType.CreateUnsignedChar() });
+            //                _context.Push(v);
+            //                _context.Assign(CType.CreateUnsignedChar());
+            //                _context.Discard();
+            //                break;
+            //        }
+            //        v.Offset += sz;
+            //        writed += sz;
+            //    }
+
+            //    return new Value { Kind = Value.ValueKind.Void };
+            //}
+
+            //public Value OnStructUnionAssignInitializer(Initializer.StructUnionAssignInitializer self, Value value) {
+            //    // value に初期化先変数位置が入っているので戦闘から順にvalueを適切に設定して再帰呼び出しすればいい。
+            //    // 共用体は初期化式が一つのはず
+            //    Value v = new Value(value);
+            //    var baseoffset = v.Offset;
+            //    var writed = 0;
+            //    foreach (var member in self.Type.Members.Zip(self.Inits, Tuple.Create)) {
+            //        v.Offset = baseoffset + member.Item1.Offset;
+            //        member.Item2.Accept(this, v);
+            //        BitFieldType bft;
+            //        if (member.Item1.Type.IsBitField(out bft)) {
+            //            writed = member.Item1.Offset + (bft.BitOffset + bft.BitWidth + 7) / 8;
+            //        } else {
+            //            writed = member.Item1.Offset + member.Item1.Type.SizeOf();
+            //        }
+            //    }
+            //    v.Offset = baseoffset + writed;
+            //    while (self.Type.SizeOf() > writed) {
+            //        var sz = Math.Min((self.Type.SizeOf() - writed), 4);
+            //        switch (sz) {
+            //            case 4:
+            //                _context.Push(new Value() { IntConst = 0, Kind = Value.ValueKind.IntConst, Type = CType.CreateUnsignedInt() });
+            //                _context.Push(v);
+            //                _context.Assign(CType.CreateUnsignedInt());
+            //                _context.Discard();
+            //                break;
+            //            case 3:
+            //            case 2:
+            //                _context.Push(new Value() { IntConst = 0, Kind = Value.ValueKind.IntConst, Type = CType.CreateUnsignedShortInt() });
+            //                _context.Push(v);
+            //                _context.Assign(CType.CreateUnsignedShortInt());
+            //                _context.Discard();
+            //                break;
+            //            case 1:
+            //                _context.Push(new Value() { IntConst = 0, Kind = Value.ValueKind.IntConst, Type = CType.CreateUnsignedChar() });
+            //                _context.Push(v);
+            //                _context.Assign(CType.CreateUnsignedChar());
+            //                _context.Discard();
+            //                break;
+            //        }
+            //        v.Offset += sz;
+            //        writed += sz;
+            //    }
+            //    return new Value { Kind = Value.ValueKind.Void };
+            //}
 
             public Value OnBreakStatement(Statement.BreakStatement self, Value value) {
                 _context.Emit($"# {self.LocationRange}");
@@ -5478,6 +5490,10 @@ namespace AnsiCParser {
 
             public void WriteCode(StreamWriter writer) {
                 _context.Codes.ForEach(x => writer.WriteLine(x.ToString()));
+            }
+
+            public Value OnDesignatedInitializer(Initializer.DesignatedInitializer self, Value value) {
+                throw new NotImplementedException();
             }
 
         }
@@ -5850,177 +5866,189 @@ namespace AnsiCParser {
             public Value OnSimpleInitializer(Initializer.SimpleInitializer self, Value value) {
                 throw new NotImplementedException();
             }
-
-            public Value OnSimpleAssignInitializer(Initializer.SimpleAssignInitializer self, Value value) {
-                var ret = ExpressionEvaluator.Eval(self.Expr);
-                if (self.Type.IsBitField()) {
-                    var bft = self.Type as BitFieldType;
-                    if (ret is Expression.PrimaryExpression.Constant.IntegerConstant) {
-                        _initValues.Add(new ValueEntry(_currentOffsetByte, bft.BitOffset, bft.BitWidth, ret));
-                        //if (bft.BitOffset + bft.BitWidth == bft.SizeOf() * 8) {
-                        //    _currentOffsetByte += bft.SizeOf();
-                        //}
-                    } else {
-                        throw new Exception("ビットフィールドに代入できない値が使われている。");
-                    }
-                } else {
-                    _initValues.Add(new ValueEntry(_currentOffsetByte, -1, -1, ret));
-                    //_currentOffsetByte += self.Type.SizeOf();
+            public Value OnConcreteInitializer(Initializer.ConcreteInitializer self, Value value) {
+                foreach (var commands in self.InitializeCommands) {
+                    var r = PathResolver.ResolvePath(commands.path);
+                    var ret = ExpressionEvaluator.Eval(commands.expr);
+                    var ty = r.Item1;
+                    var offsetByte = r.Item2;
+                    var offsetBit = ty.IsBitField() ? ((DataType.BitFieldType)ty).BitOffset : -1;
+                    var bitWidth  = ty.IsBitField() ? ((DataType.BitFieldType)ty).BitWidth : -1;
+                    _initValues.Add(new ValueEntry(offsetByte, offsetBit, bitWidth, ret));
                 }
                 return value;
             }
 
-            public Value OnArrayAssignInitializer(Initializer.ArrayAssignInitializer self, Value value) {
-                var arrayType = self.Type.Unwrap() as ArrayType;
+            //public Value OnSimpleAssignInitializer(Initializer.SimpleAssignInitializer self, Value value) {
+            //    var ret = ExpressionEvaluator.Eval(self.Expr);
+            //    if (self.Type.IsBitField()) {
+            //        var bft = self.Type as BitFieldType;
+            //        if (ret is Expression.PrimaryExpression.Constant.IntegerConstant) {
+            //            _initValues.Add(new ValueEntry(_currentOffsetByte, bft.BitOffset, bft.BitWidth, ret));
+            //            //if (bft.BitOffset + bft.BitWidth == bft.SizeOf() * 8) {
+            //            //    _currentOffsetByte += bft.SizeOf();
+            //            //}
+            //        } else {
+            //            throw new Exception("ビットフィールドに代入できない値が使われている。");
+            //        }
+            //    } else {
+            //        _initValues.Add(new ValueEntry(_currentOffsetByte, -1, -1, ret));
+            //        //_currentOffsetByte += self.Type.SizeOf();
+            //    }
+            //    return value;
+            //}
 
-                foreach (var s in self.Inits) {
-                    s.Accept(this, value);
-                    _currentOffsetByte += arrayType.ElementType.SizeOf();
-                }
+            //public Value OnArrayAssignInitializer(Initializer.ArrayAssignInitializer self, Value value) {
+            //    var arrayType = self.Type.Unwrap() as ArrayType;
 
-                var filledSize = (arrayType.Length - self.Inits.Count) * arrayType.ElementType.SizeOf();
-                while (filledSize > 0) {
-                    if (filledSize >= 4) {
-                        _initValues.Add(new ValueEntry(_currentOffsetByte, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedLongInt)));
-                        _currentOffsetByte += 4;
-                        filledSize -= 4;
-                    } else if (filledSize >= 2) {
-                        _initValues.Add(new ValueEntry(_currentOffsetByte, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedShortInt)));
-                        _currentOffsetByte += 2;
-                        filledSize -= 2;
-                    } else if (filledSize >= 1) {
-                        _initValues.Add(new ValueEntry(_currentOffsetByte, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedChar)));
-                        _currentOffsetByte += 1;
-                        filledSize -= 1;
-                    }
-                }
+            //    foreach (var s in self.Inits) {
+            //        s.Accept(this, value);
+            //        _currentOffsetByte += arrayType.ElementType.SizeOf();
+            //    }
 
-                return value;
-            }
+            //    var filledSize = (arrayType.Length - self.Inits.Count) * arrayType.ElementType.SizeOf();
+            //    while (filledSize > 0) {
+            //        if (filledSize >= 4) {
+            //            _initValues.Add(new ValueEntry(_currentOffsetByte, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedLongInt)));
+            //            _currentOffsetByte += 4;
+            //            filledSize -= 4;
+            //        } else if (filledSize >= 2) {
+            //            _initValues.Add(new ValueEntry(_currentOffsetByte, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedShortInt)));
+            //            _currentOffsetByte += 2;
+            //            filledSize -= 2;
+            //        } else if (filledSize >= 1) {
+            //            _initValues.Add(new ValueEntry(_currentOffsetByte, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedChar)));
+            //            _currentOffsetByte += 1;
+            //            filledSize -= 1;
+            //        }
+            //    }
 
-            public Value OnStructUnionAssignInitializer(Initializer.StructUnionAssignInitializer self, Value value) {
-                var start = _initValues.Count;
-                var suType = self.Type.Unwrap() as TaggedType.StructUnionType;
+            //    return value;
+            //}
 
-                var baseCurrentOffsetByte = _currentOffsetByte;
-                foreach (var s in self.Inits.Zip(suType.Members, Tuple.Create)) {
-                    _currentOffsetByte = baseCurrentOffsetByte + s.Item2.Offset;
-                    s.Item1.Accept(this, value);
-                }
+            //public Value OnStructUnionAssignInitializer(Initializer.StructUnionAssignInitializer self, Value value) {
+            //    var start = _initValues.Count;
+            //    var suType = self.Type.Unwrap() as TaggedType.StructUnionType;
 
-                if (suType.IsStructureType()) {
-                    foreach (var x in suType.Members.Skip(self.Inits.Count)) {
-                        if (x.Type.IsBitField()) {
-                            var bft = x.Type as BitFieldType;
-                            var bt = bft.Type as BasicType;
-                            var off = baseCurrentOffsetByte + x.Offset + bft.BitOffset / 8;
-                            _initValues.Add(new ValueEntry(off, bft.BitOffset, bft.BitWidth, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, bt.Kind)));
-                            _currentOffsetByte = baseCurrentOffsetByte + x.Offset + (bft.BitOffset + bft.BitWidth) / 8;
-                        } else {
-                            var fillSize = x.Type.SizeOf();
-                            while (fillSize > 0) {
-                                var off = baseCurrentOffsetByte + x.Offset;
-                                if (fillSize >= 4) {
-                                    fillSize -= 4;
-                                    _initValues.Add(new ValueEntry(off, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedLongInt)));
-                                    _currentOffsetByte = off + 4;
-                                } else if (fillSize >= 2) {
-                                    fillSize -= 2;
-                                    _initValues.Add(new ValueEntry(off, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedShortInt)));
-                                    _currentOffsetByte = off + 4;
-                                } else if (fillSize >= 1) {
-                                    fillSize -= 1;
-                                    _initValues.Add(new ValueEntry(off, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedChar)));
-                                    _currentOffsetByte = off + 4;
-                                }
-                            }
-                        }
-                    }
-                }
+            //    var baseCurrentOffsetByte = _currentOffsetByte;
+            //    foreach (var s in self.Inits.Zip(suType.Members, Tuple.Create)) {
+            //        _currentOffsetByte = baseCurrentOffsetByte + s.Item2.Offset;
+            //        s.Item1.Accept(this, value);
+            //    }
 
-                var end = _initValues.Count;
+            //    if (suType.IsStructureType()) {
+            //        foreach (var x in suType.Members.Skip(self.Inits.Count)) {
+            //            if (x.Type.IsBitField()) {
+            //                var bft = x.Type as BitFieldType;
+            //                var bt = bft.Type as BasicType;
+            //                var off = baseCurrentOffsetByte + x.Offset + bft.BitOffset / 8;
+            //                _initValues.Add(new ValueEntry(off, bft.BitOffset, bft.BitWidth, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, bt.Kind)));
+            //                _currentOffsetByte = baseCurrentOffsetByte + x.Offset + (bft.BitOffset + bft.BitWidth) / 8;
+            //            } else {
+            //                var fillSize = x.Type.SizeOf();
+            //                while (fillSize > 0) {
+            //                    var off = baseCurrentOffsetByte + x.Offset;
+            //                    if (fillSize >= 4) {
+            //                        fillSize -= 4;
+            //                        _initValues.Add(new ValueEntry(off, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedLongInt)));
+            //                        _currentOffsetByte = off + 4;
+            //                    } else if (fillSize >= 2) {
+            //                        fillSize -= 2;
+            //                        _initValues.Add(new ValueEntry(off, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedShortInt)));
+            //                        _currentOffsetByte = off + 4;
+            //                    } else if (fillSize >= 1) {
+            //                        fillSize -= 1;
+            //                        _initValues.Add(new ValueEntry(off, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "0", 0, BasicType.TypeKind.UnsignedChar)));
+            //                        _currentOffsetByte = off + 4;
+            //                    }
+            //                }
+            //            }
+            //        }
+            //    }
 
-                var i = start;
-                while (i < _initValues.Count) {
-                    var val = _initValues[i];
-                    var byteOffset = val.ByteOffset;
-                    var bitOffset = val.BitOffset;
-                    var bitSize = val.BitSize;
-                    var expr = val.Expr;
-                    if (bitSize == -1) {
-                        i++;
-                        continue;
-                    }
+            //    var end = _initValues.Count;
 
-                    List<byte> v = new List<byte>();
-                    while (i < _initValues.Count && _initValues[i].ByteOffset == byteOffset) {
+            //    var i = start;
+            //    while (i < _initValues.Count) {
+            //        var val = _initValues[i];
+            //        var byteOffset = val.ByteOffset;
+            //        var bitOffset = val.BitOffset;
+            //        var bitSize = val.BitSize;
+            //        var expr = val.Expr;
+            //        if (bitSize == -1) {
+            //            i++;
+            //            continue;
+            //        }
 
-                        var cvalue = _initValues[i].Expr.Accept(this, value);
-                        var bOffset = _initValues[i].BitOffset;
-                        var bSize = _initValues[i].BitSize;
-                        if (cvalue.Kind != Value.ValueKind.IntConst) {
-                            // ビットフィールド中に定数式以外が使われている。
-                            throw new Exception("ビットフィールドに対応する初期化子の要素が定数ではありません。");
-                        }
-                        ulong bits = 0;
-                        switch (cvalue.Type.SizeOf()) {
-                            case 1:
-                                if (Specification.IsUnsignedIntegerType(cvalue.Type)) {
-                                    bits = (ulong)(((byte)(((sbyte)cvalue.IntConst) << (8 - bSize))) >> (8 - bSize));
-                                } else {
-                                    bits = (ulong)(((byte)(((byte)cvalue.IntConst) << (8 - bSize))) >> (8 - bSize));
-                                }
-                                break;
-                            case 2:
-                                if (Specification.IsUnsignedIntegerType(cvalue.Type)) {
-                                    bits = (ulong)(((ushort)(((short)cvalue.IntConst) << (16 - bSize))) >> (16 - bSize));
-                                } else {
-                                    bits = (ulong)(((ushort)(((ushort)cvalue.IntConst) << (16 - bSize))) >> (16 - bSize));
-                                }
-                                break;
-                            case 4:
-                                if (Specification.IsUnsignedIntegerType(cvalue.Type)) {
-                                    bits = (ulong)(((uint)(((int)cvalue.IntConst) << (32 - bSize))) >> (32 - bSize));
-                                } else {
-                                    bits = (ulong)(((uint)(((uint)cvalue.IntConst) << (32 - bSize))) >> (32 - bSize));
-                                }
-                                break;
-                            case 8:
-                                if (Specification.IsUnsignedIntegerType(cvalue.Type)) {
-                                    bits = (ulong)(((ulong)(((long)cvalue.IntConst) << (64 - bSize))) >> (64 - bSize));
-                                } else {
-                                    bits = (ulong)(((ulong)(((ulong)cvalue.IntConst) << (64 - bSize))) >> (64 - bSize));
-                                }
-                                break;
-                            default:
-                                throw new ArgumentOutOfRangeException();
-                        }
+            //        List<byte> v = new List<byte>();
+            //        while (i < _initValues.Count && _initValues[i].ByteOffset == byteOffset) {
 
-                        var vstart = bOffset / 8;
-                        var vend = (bOffset + bSize + 7) / 8;
-                        while (v.Count < vend) {
-                            v.Add(0);
-                        }
-                        for (var j = vstart; j < vend; j++) {
-                            if (bOffset > (j * 8)) {
-                                v[j] |= (byte)(bits << (bOffset - (j * 8)));
-                            } else if (bOffset < (j * 8)) {
-                                v[j] |= (byte)(bits >> ((j * 8) - bOffset));
-                            } else {
-                                v[j] |= (byte)(bits);
-                            }
-                        }
-                        _initValues.RemoveAt(i);
-                    }
-                    for (var j = 0; j < v.Count; j++) {
-                        _initValues.Insert(i + j, new ValueEntry(byteOffset + j, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, v.ToString(), (long)v[j], BasicType.TypeKind.UnsignedChar)));
-                    }
+            //            var cvalue = _initValues[i].Expr.Accept(this, value);
+            //            var bOffset = _initValues[i].BitOffset;
+            //            var bSize = _initValues[i].BitSize;
+            //            if (cvalue.Kind != Value.ValueKind.IntConst) {
+            //                // ビットフィールド中に定数式以外が使われている。
+            //                throw new Exception("ビットフィールドに対応する初期化子の要素が定数ではありません。");
+            //            }
+            //            ulong bits = 0;
+            //            switch (cvalue.Type.SizeOf()) {
+            //                case 1:
+            //                    if (Specification.IsUnsignedIntegerType(cvalue.Type)) {
+            //                        bits = (ulong)(((byte)(((sbyte)cvalue.IntConst) << (8 - bSize))) >> (8 - bSize));
+            //                    } else {
+            //                        bits = (ulong)(((byte)(((byte)cvalue.IntConst) << (8 - bSize))) >> (8 - bSize));
+            //                    }
+            //                    break;
+            //                case 2:
+            //                    if (Specification.IsUnsignedIntegerType(cvalue.Type)) {
+            //                        bits = (ulong)(((ushort)(((short)cvalue.IntConst) << (16 - bSize))) >> (16 - bSize));
+            //                    } else {
+            //                        bits = (ulong)(((ushort)(((ushort)cvalue.IntConst) << (16 - bSize))) >> (16 - bSize));
+            //                    }
+            //                    break;
+            //                case 4:
+            //                    if (Specification.IsUnsignedIntegerType(cvalue.Type)) {
+            //                        bits = (ulong)(((uint)(((int)cvalue.IntConst) << (32 - bSize))) >> (32 - bSize));
+            //                    } else {
+            //                        bits = (ulong)(((uint)(((uint)cvalue.IntConst) << (32 - bSize))) >> (32 - bSize));
+            //                    }
+            //                    break;
+            //                case 8:
+            //                    if (Specification.IsUnsignedIntegerType(cvalue.Type)) {
+            //                        bits = (ulong)(((ulong)(((long)cvalue.IntConst) << (64 - bSize))) >> (64 - bSize));
+            //                    } else {
+            //                        bits = (ulong)(((ulong)(((ulong)cvalue.IntConst) << (64 - bSize))) >> (64 - bSize));
+            //                    }
+            //                    break;
+            //                default:
+            //                    throw new ArgumentOutOfRangeException();
+            //            }
 
-                    i += v.Count;
+            //            var vstart = bOffset / 8;
+            //            var vend = (bOffset + bSize + 7) / 8;
+            //            while (v.Count < vend) {
+            //                v.Add(0);
+            //            }
+            //            for (var j = vstart; j < vend; j++) {
+            //                if (bOffset > (j * 8)) {
+            //                    v[j] |= (byte)(bits << (bOffset - (j * 8)));
+            //                } else if (bOffset < (j * 8)) {
+            //                    v[j] |= (byte)(bits >> ((j * 8) - bOffset));
+            //                } else {
+            //                    v[j] |= (byte)(bits);
+            //                }
+            //            }
+            //            _initValues.RemoveAt(i);
+            //        }
+            //        for (var j = 0; j < v.Count; j++) {
+            //            _initValues.Insert(i + j, new ValueEntry(byteOffset + j, -1, -1, (Expression)new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, v.ToString(), (long)v[j], BasicType.TypeKind.UnsignedChar)));
+            //        }
 
-                }
-                return value;
-            }
+            //        i += v.Count;
+
+            //    }
+            //    return value;
+            //}
 
             public Value OnBreakStatement(Statement.BreakStatement self, Value value) {
                 throw new NotImplementedException();
@@ -6089,6 +6117,10 @@ namespace AnsiCParser {
                 throw new NotImplementedException();
             }
 
+            public Value OnDesignatedInitializer(Initializer.DesignatedInitializer self, Value value) {
+                throw new NotImplementedException();
+            }
+
         }
 
         public void Compile(Ast ret, StreamWriter o) {
@@ -6097,6 +6129,38 @@ namespace AnsiCParser {
             var visitor = new SyntaxTreeCompileVisitor(context);
             ret.Accept(visitor, v);
             visitor.WriteCode(o);
+        }
+    }
+
+    public static class PathResolver {
+        private static Tuple<CType, int> Resolve(TyNav.PathPart path, int offsetByte) {
+            CType elem;
+            int len;
+            if (path.ParentType.IsArrayType(out elem, out len)) {
+                var elementSize = elem.SizeOf();
+                offsetByte += elementSize * path.Index;
+                return Tuple.Create(elem, offsetByte);
+            }
+            TaggedType.StructUnionType suType;
+            if (path.ParentType.IsStructureType(out suType)) {
+                offsetByte += suType.Members[path.Index].Offset;
+                return Tuple.Create(suType.Members[path.Index].Type, offsetByte);
+            }
+            if (path.ParentType.IsUnionType(out suType)) {
+                return Tuple.Create(suType.Members[path.Index].Type, offsetByte);
+            }
+            return Tuple.Create(path.ParentType, offsetByte);
+        }
+
+        public static Tuple<CType, int> ResolvePath(TyNav.PathPart[] path) {
+            int offset = 0;
+            CType type = null;
+            foreach (var p in path) {
+                var r = Resolve(p, offset);
+                type = r.Item1;
+                offset = r.Item2;
+            }
+            return Tuple.Create(type, offset);
         }
     }
 }

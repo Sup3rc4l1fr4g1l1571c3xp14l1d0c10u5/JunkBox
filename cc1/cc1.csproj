@@ -35,6 +35,7 @@
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Runtime.Serialization" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -56,12 +57,13 @@
     <Compile Include="src\DataType.PointerType.cs" />
     <Compile Include="src\DataType.StubType.cs" />
     <Compile Include="src\DataType.TaggedType.cs" />
-    <Compile Include="src\DataType.ToSExprVisitor.cs" />
+    <Compile Include="src\DataType.ToJsonVisitor.cs" />
     <Compile Include="src\DataType.ToStringVisitor.cs" />
     <Compile Include="src\DataType.TypedefType.cs" />
     <Compile Include="src\DataType.TypeQualifier.cs" />
     <Compile Include="src\DataType.TypeQualifierType.cs" />
     <Compile Include="src\DataType.VisitorExt.cs" />
+    <Compile Include="src\DynamicJson.cs" />
     <Compile Include="src\Ext.cs" />
     <Compile Include="src\FunctionSpecifier.cs" />
     <Compile Include="src\LabelScopeValue.cs" />
@@ -74,7 +76,6 @@
     <Compile Include="src\Logger.cs" />
     <Compile Include="src\Parser.cs" />
     <Compile Include="src\Program.cs" />
-    <Compile Include="src\Scheme.cs" />
     <Compile Include="src\Scope.cs" />
     <Compile Include="src\Settings.cs" />
     <Compile Include="src\Specification.cs" />
@@ -83,11 +84,10 @@
     <Compile Include="src\SyntaxTree.Declaration.cs" />
     <Compile Include="src\SyntaxTree.Expression.cs" />
     <Compile Include="src\SyntaxTree.ExpressionEvaluator.cs" />
-    <Compile Include="src\SyntaxTree.Initializer.cs" />
-    <Compile Include="src\SyntaxTree.InitializerChecker.cs" />
+    <Compile Include="src\SyntaxTree.Initializer2.cs" />
     <Compile Include="src\SyntaxTree.IVisitor.cs" />
     <Compile Include="src\SyntaxTree.Statement.cs" />
-    <Compile Include="src\SyntaxTree.ToSExprVisitor.cs" />
+    <Compile Include="src\SyntaxTree.ToJsonVisitor.cs" />
     <Compile Include="src\SyntaxTree.TranslationUnit.cs" />
     <Compile Include="src\SyntaxTree.VisitorExt.cs" />
     <Compile Include="src\Token.cs" />

@@ -294,9 +294,9 @@ namespace AnsiCParser.SyntaxTree {
                 throw new CompilerException.InternalErrorException(self.LocationRange, "定数式中で引数変数は利用できません。");
             }
 
-            public Expression OnArrayAssignInitializer(Initializer.ArrayAssignInitializer self, Expression value) {
-                throw new NotImplementedException();
-            }
+            //public Expression OnArrayAssignInitializer(Initializer.ArrayAssignInitializer self, Expression value) {
+            //    throw new NotImplementedException();
+            //}
 
             public Expression OnArraySubscriptingExpression(Expression.PostfixExpression.ArraySubscriptingExpression self, Expression value) {
                 throw new Exception("");
@@ -725,9 +725,9 @@ namespace AnsiCParser.SyntaxTree {
                 throw new Exception();
             }
 
-            public Expression OnSimpleAssignInitializer(Initializer.SimpleAssignInitializer self, Expression value) {
-                throw new NotImplementedException();
-            }
+            //public Expression OnSimpleAssignInitializer(Initializer.SimpleAssignInitializer self, Expression value) {
+            //    throw new NotImplementedException();
+            //}
 
             public Expression OnSimpleAssignmentExpression(Expression.AssignmentExpression.SimpleAssignmentExpression self, Expression value) {
                 throw new CompilerException.SpecificationErrorException(self.LocationRange, "定数式は，代入，増分，減分，関数呼出し又はコンマ演算子を含んではならない。");
@@ -738,7 +738,7 @@ namespace AnsiCParser.SyntaxTree {
             }
 
             public Expression OnSizeofExpression(Expression.SizeofExpression self, Expression value) {
-                return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", self.Type.SizeOf(), ((BasicType)self.Type.Unwrap()).Kind);
+                return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", self.ExprOperand.Type.SizeOf(), ((BasicType)self.Type.Unwrap()).Kind);
             }
 
             public Expression OnSizeofTypeExpression(Expression.SizeofTypeExpression self, Expression value) {
@@ -749,9 +749,9 @@ namespace AnsiCParser.SyntaxTree {
                 return self;
             }
 
-            public Expression OnStructUnionAssignInitializer(Initializer.StructUnionAssignInitializer self, Expression value) {
-                throw new NotImplementedException();
-            }
+            //public Expression OnStructUnionAssignInitializer(Initializer.StructUnionAssignInitializer self, Expression value) {
+            //    throw new NotImplementedException();
+            //}
 
             public Expression OnSwitchStatement(Statement.SwitchStatement self, Expression value) {
                 throw new NotImplementedException();
@@ -952,6 +952,13 @@ namespace AnsiCParser.SyntaxTree {
                 throw new NotImplementedException();
             }
 
+            public Expression OnDesignatedInitializer(Initializer.DesignatedInitializer self, Expression value) {
+                throw new NotImplementedException();
+            }
+
+            public Expression OnConcreteInitializer(Initializer.ConcreteInitializer self, Expression value) {
+                throw new NotImplementedException();
+            }
         }
 
         /// <summary>

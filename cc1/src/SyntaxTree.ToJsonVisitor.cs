@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Linq.Expressions;
 using AnsiCParser.DataType;
 using Codeplex.Data;
 
@@ -60,14 +61,14 @@ namespace AnsiCParser.SyntaxTree {
             };
         }
 
-        public object OnArrayAssignInitializer(Initializer.ArrayAssignInitializer self, object value) {
-            return new {
-                Class = "ArrayAssignInitializer",
-                LocationRange = LocationRangeToJson(self.LocationRange),
-                Type = self.Type.Accept(new DataType.ToJsonVisitor(), null),
-                Inits = self.Inits.Select(x => x.Accept(this, value)).Cast<object>().ToArray(),
-            };
-        }
+        //public object OnArrayAssignInitializer(Initializer.ArrayAssignInitializer self, object value) {
+        //    return new {
+        //        Class = "ArrayAssignInitializer",
+        //        LocationRange = LocationRangeToJson(self.LocationRange),
+        //        Type = self.Type.Accept(new DataType.ToJsonVisitor(), null),
+        //        Inits = self.Inits.Select(x => x.Accept(this, value)).Cast<object>().ToArray(),
+        //    };
+        //}
 
         public object OnArraySubscriptingExpression(Expression.PostfixExpression.ArraySubscriptingExpression self, object value) {
             return new {
@@ -458,14 +459,14 @@ namespace AnsiCParser.SyntaxTree {
             };
         }
 
-        public object OnSimpleAssignInitializer(Initializer.SimpleAssignInitializer self, object value) {
-            return new {
-                Class = "SimpleAssignInitializer",
-                LocationRange = LocationRangeToJson(self.LocationRange),
-                Type = self.Type.Accept(new DataType.ToJsonVisitor(), null),
-                Expr = self.Expr?.Accept(this, value),
-            };
-        }
+        //public object OnSimpleAssignInitializer(Initializer.SimpleAssignInitializer self, object value) {
+        //    return new {
+        //        Class = "SimpleAssignInitializer",
+        //        LocationRange = LocationRangeToJson(self.LocationRange),
+        //        Type = self.Type.Accept(new DataType.ToJsonVisitor(), null),
+        //        Expr = self.Expr?.Accept(this, value),
+        //    };
+        //}
 
         public object OnSimpleAssignmentExpression(Expression.AssignmentExpression.SimpleAssignmentExpression self, object value) {
             return new {
@@ -508,14 +509,14 @@ namespace AnsiCParser.SyntaxTree {
             };
         }
 
-        public object OnStructUnionAssignInitializer(Initializer.StructUnionAssignInitializer self, object value) {
-            return new {
-                Class = "StructUnionAssignInitializer",
-                LocationRange = LocationRangeToJson(self.LocationRange),
-                Type = self.Type.Accept(new DataType.ToJsonVisitor(), null),
-                Inits = self.Inits.Select(x => x.Accept(this, value)).ToArray(),
-            };
-        }
+        //public object OnStructUnionAssignInitializer(Initializer.StructUnionAssignInitializer self, object value) {
+        //    return new {
+        //        Class = "StructUnionAssignInitializer",
+        //        LocationRange = LocationRangeToJson(self.LocationRange),
+        //        Type = self.Type.Accept(new DataType.ToJsonVisitor(), null),
+        //        Inits = self.Inits.Select(x => x.Accept(this, value)).ToArray(),
+        //    };
+        //}
 
         public object OnSwitchStatement(Statement.SwitchStatement self, object value) {
             return new {
@@ -676,6 +677,35 @@ namespace AnsiCParser.SyntaxTree {
             };
         }
 
+        public object OnDesignatedInitializer(Initializer.DesignatedInitializer self, object value) {
+            return new {
+                Class = "DesignatedInitializer",
+                LocationRange = LocationRangeToJson(self.LocationRange),
+                Cond = self.DesignatorParts.Select(x => {
+                    if (x is Initializer.DesignatedInitializer.Designator.IndexDesignator) {
+                        var id = x as Initializer.DesignatedInitializer.Designator.IndexDesignator;
+                        return (object)new { Class = "IndexDesignator", Index = id.Index };
+                    } else if (x is Initializer.DesignatedInitializer.Designator.MemberDesignator) {
+                        var md = x as Initializer.DesignatedInitializer.Designator.MemberDesignator;
+                        return (object)new { Class = "MemberDesignator", Member = md.Member };
+                    } else {
+                        throw new Exception();
+                    }
+                }).ToArray(),
+                Stmt = self.InitializerExpression.Accept(this, value),
+            };
+        }
 
+        public object OnConcreteInitializer(Initializer.ConcreteInitializer self, object value) {
+            return new {
+                Class = "ConcreteInitializer",
+                LocationRange = LocationRangeToJson(self.LocationRange),
+                InitializeCommands = self.InitializeCommands.Select(x => {
+                    var path = x.path.Select(y => { return (object)new { Type = y.ParentType.Accept(new DataType.ToJsonVisitor(), null), Index = y.Index }; }).ToArray();
+                    var expr = x.expr.Accept(this, value);
+                    return (object)new { Path = path, Expr = expr };
+                }).ToArray()
+            };
+        }
     }
 }

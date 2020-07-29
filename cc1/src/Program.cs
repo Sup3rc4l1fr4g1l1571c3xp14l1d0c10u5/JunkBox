@@ -132,18 +132,81 @@ namespace AnsiCParser {
 
         static void DebugMain(string[] args) {
             var ret = new Parser(
-                System.IO.File.ReadAllText(@"C:\Users\0079595\Documents\Visual Studio 2015\Projects\cc1\c-testsuite-master\tests\single-exec\00114.c") /*
+                System.IO.File.ReadAllText(@"C:\Users\whelp\Desktop\cc1\TestCase\array-initializer_00001.c") /*
                 @"
-enum {
-    zero = '\0'
+int x =1;
+
+struct {
+    int i;
+    int f;
+    int a[2];
+} s1 = {
+    .f=3,
+    .i=2,
+    .a[1]=9
 };
 
-int *p = zero;
+struct {
+    int i;
+    int f;
+    struct { int x; int y; } a[2];
+} s2 = {
+    .f=3,
+    .i=2,
+    .a[1]=9,10
+};
+
+struct {
+    int x;
+    int y;
+} a1[3] = {1, 2, 3, 4, 5, 6};
+
+struct {
+    int x;
+    int y;
+} a2[3] = {
+    {1, 2},
+    {3, 4},
+    5, 6
+};
+
+struct {
+  int x;
+  int y;
+} a3[3] = {
+  [2].y=6, [2].x=5,
+  [1].y=4, [1].x=3,
+  [0].y=2, [0].x=1
+};
+
+struct { int a[3]; int b; } w1[] = { 
+    [0].a = {1}, 
+    [1].a[0] = 2 
+};
+
+struct { int a[3]; int b; } w2[] = {
+   { { 1, 0, 0 }, 0 },
+   { { 2, 0, 0 }, 0 } 
+};
+
+int x1 = 1;
+int x2 = {1};
+int x3 = {1,2,3};
+int x4 = {{1},2,3};
+
+int y1[] = {1};
+int y2[] = {1,2,3};
+int y3[] = {{1},2,3};
+
+int b[100] = {  [98]=98,99,[10] = 10,11,12, [0] = 0,1,2,};
 
 
 "//*/
                 , "<Debug>").Parse();
-            using (var o = new System.IO.StreamWriter(System.IO.Path.GetTempFileName())) {
+            using (var o = new System.IO.StreamWriter("debug.ast")) {
+                o.WriteLine(DynamicJson.Serialize(ret.Accept(new ToJsonVisitor(), null)));
+            }
+            using (var o = new System.IO.StreamWriter("debug.s")) {
                 var compiler = new Compiler();
                 compiler.Compile(ret, o);
             }

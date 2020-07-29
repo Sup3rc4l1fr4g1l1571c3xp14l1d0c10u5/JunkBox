@@ -50,9 +50,12 @@ namespace AnsiCParser.SyntaxTree {
         TResult OnUnaryReferenceExpression(Expression.UnaryReferenceExpression self, TArg value);
         TResult OnComplexInitializer(Initializer.ComplexInitializer self, TArg value);
         TResult OnSimpleInitializer(Initializer.SimpleInitializer self, TArg value);
-        TResult OnSimpleAssignInitializer(Initializer.SimpleAssignInitializer self, TArg value);
-        TResult OnArrayAssignInitializer(Initializer.ArrayAssignInitializer self, TArg value);
-        TResult OnStructUnionAssignInitializer(Initializer.StructUnionAssignInitializer self, TArg value);
+        TResult OnDesignatedInitializer(Initializer.DesignatedInitializer self, TArg value);
+        TResult OnConcreteInitializer(Initializer.ConcreteInitializer self, TArg value);
+
+        //TResult OnSimpleAssignInitializer(Initializer.SimpleAssignInitializer self, TArg value);
+        //TResult OnArrayAssignInitializer(Initializer.ArrayAssignInitializer self, TArg value);
+        //TResult OnStructUnionAssignInitializer(Initializer.StructUnionAssignInitializer self, TArg value);
         TResult OnBreakStatement(Statement.BreakStatement self, TArg value);
         TResult OnCaseStatement(Statement.CaseStatement self, TArg value);
         TResult OnCompoundStatementC89(Statement.CompoundStatementC89 self, TArg value);

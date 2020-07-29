@@ -1,4 +1,5 @@
 using System;
+using System.CodeDom;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -1492,10 +1493,10 @@ namespace AnsiCParser {
         /// <returns></returns>
         private List<TaggedType.StructUnionType.MemberInfo> StructDeclaratorList(CType type) {
             var ret = new List<TaggedType.StructUnionType.MemberInfo>();
-            ret.Add(StructDeclarator(type));
-            while (_lexer.ReadTokenIf(',')) {
-                ret.Add(StructDeclarator(type));
-            }
+            do {
+                var sd = StructDeclarator(type);
+                if (sd != null) { ret.Add(sd); }
+            } while (_lexer.ReadTokenIf(','));
             return ret;
         }
 
@@ -1541,15 +1542,22 @@ namespace AnsiCParser {
                 }
 
                 return new TaggedType.StructUnionType.MemberInfo(ident, type, 0);
-            }
+            } else {
 
-            if (_lexer.ReadTokenIf(':')) {
-                // ビットフィールド部分(must)
-                sbyte size = BitFieldSize();
-                return new TaggedType.StructUnionType.MemberInfo(null, new BitFieldType(null, type, 0, size), 0);
-            }
+                if (_lexer.ReadTokenIf(':')) {
+                    // ビットフィールド部分(must)
+                    sbyte size = BitFieldSize();
+                    return new TaggedType.StructUnionType.MemberInfo(null, new BitFieldType(null, type, 0, size), 0);
+                }
 
-            throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, "構造体/共用体のメンバ宣言子では、宣言子とビットフィールド部の両方を省略することはできません。無名構造体/共用体を使用できるのは規格上はC11からです。(C11 6.7.2.1で規定)。");
+                TaggedType.StructUnionType stType;
+                if ((type.IsStructureType(out stType) || type.IsUnionType(out stType)) && (stType.TagName == null)) {
+                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, "構造体/共用体のメンバ宣言子では、宣言子とビットフィールド部の両方を省略することはできません。無名構造体/共用体を使用できるのは規格上はC11からです。(C11 6.7.2.1で規定)。");
+                } else {
+                    Logger.Warning(_lexer.CurrentToken().Range, "構造体/共用体中に宣言がありますが、宣言子がないためこの宣言は何の意味も持ちません。");
+                    return null;
+                }
+            }
         }
 
         /// <summary>
@@ -2186,7 +2194,9 @@ namespace AnsiCParser {
         /// <returns></returns>
         private Initializer Initializer(CType type, bool isLocalVariableInit) {
             var init = InitializerItem();
-            return InitializerChecker.CheckInitializer(type, init, isLocalVariableInit);
+            var results = Builder.parsing(type, init, isLocalVariableInit);
+            return new Initializer.ConcreteInitializer(init.LocationRange, init, results);
+            //return InitializerChecker.CheckInitializer(type, init, isLocalVariableInit);
         }
 
         /// <summary>
@@ -2205,8 +2215,41 @@ namespace AnsiCParser {
                 var endToken = _lexer.ReadToken('}');
                 return new Initializer.ComplexInitializer(new LocationRange(startTok.Start, endToken.End), ret);
             } else {
-                var ret = AssignmentExpression();
-                return new Initializer.SimpleInitializer(ret.LocationRange, ret);
+                if (_lexer.PeekToken(out startTok, '[') || _lexer.PeekToken(out startTok, '.')) {
+                    var start = startTok.Start;
+                    var end = startTok.Start;
+                    var designators = new List<Initializer.Designator>();
+                    for (; ; ) {
+                        if (_lexer.ReadTokenIf(out startTok, '[')) {
+                            // c99 要素指示子
+                            var indexExpr = ConstantExpression();
+                            var value = ExpressionEvaluator.Eval(indexExpr);
+                            if (value.Type.IsIntegerType() == false) {
+                                throw new CompilerException.SpecificationErrorException(indexExpr.LocationRange, "要素指示子の添え字が整数定数値ではありません。");
+                            }
+                            long? v = ExpressionEvaluator.ToLong(value);
+                            if (v == null) {
+                                throw new CompilerException.SpecificationErrorException(indexExpr.LocationRange, "要素指示子の添え字が整数定数値ではありません。");
+                            }
+                            designators.Add(new Initializer.Designator.IndexDesignator(indexExpr, (int)v.Value));
+                            var endToken = _lexer.ReadToken(']');
+                            end = endToken.End;
+                        } else if (_lexer.ReadTokenIf(out startTok, '.')) {
+                            // c99 要素指示子
+                            var ident = Identifier(false);
+                            designators.Add(new Initializer.Designator.MemberDesignator(ident.Raw));
+                            end = ident.End;
+                        } else {
+                            break;
+                        }
+                    }
+                    _lexer.ReadToken('=');
+                    var expr = InitializerItem();
+                    return new Initializer.DesignatedInitializer(new LocationRange(start, end), designators, expr);
+                } else {
+                    var ret = AssignmentExpression();
+                    return new Initializer.SimpleInitializer(ret.LocationRange, ret);
+                }
             }
         }
 
@@ -2405,7 +2448,9 @@ namespace AnsiCParser {
                     var tok = new Token(Token.TokenKind.IDENTIFIER, LocationRange.Builtin.Start, LocationRange.Builtin.End, "__func__");
                     var tyConstStr = new TypeQualifierType(new PointerType(new TypeQualifierType(CType.CreateChar(), DataType.TypeQualifier.Const)), DataType.TypeQualifier.Const);
                     var varDecl = new Declaration.VariableDeclaration(LocationRange.Builtin, "__func__", tyConstStr, AnsiCParser.StorageClassSpecifier.Static);
-                    varDecl.Init = new Initializer.SimpleAssignInitializer(LocationRange.Builtin, tyConstStr, new SyntaxTree.Expression.PrimaryExpression.StringExpression(LocationRange.Empty, AllocStringLabel(), new List<string> { "\"" + funcName + "\"" }));
+                    var initExpr = new SyntaxTree.Expression.PrimaryExpression.StringExpression(LocationRange.Empty, AllocStringLabel(), new List<string> { "\"" + funcName + "\"" });
+                    //varDecl.Init = new Initializer.ConcreteInitializer(LocationRange.Builtin, null, new[] { new Result() { path = new Tuple<CType, int>[0], expr = initExpr } });
+                    varDecl.Init = new Initializer.SimpleInitializer(LocationRange.Builtin, initExpr);
                     _identScope.Add("__func__", varDecl);
                     decls.Add(varDecl);
                     varDecl.LinkageObject = _linkageObjectTable.RegistLinkageObject(tok, LinkageKind.NoLinkage, varDecl, true);
@@ -2764,7 +2809,8 @@ namespace AnsiCParser {
                 var e = Expression();
                 _lexer.ReadToken(')');
                 var end = _lexer.CurrentToken().End;
-                var expr = new Expression.PrimaryExpression.EnclosedInParenthesesExpression(new LocationRange(start, end), e);
+#warning 式 e に ParenthesesExpressionフラグを付けるよう変更
+                var expr = e;// new Expression.PrimaryExpression.EnclosedInParenthesesExpression(new LocationRange(start, end), e);
                 return expr;
             }
 

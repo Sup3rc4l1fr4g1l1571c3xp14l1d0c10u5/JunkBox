@@ -156,15 +156,21 @@ namespace AnsiCParser.SyntaxTree {
         public static TResult Accept<TResult, TArg>(this Initializer.SimpleInitializer self, IVisitor<TResult, TArg> visitor, TArg value) {
             return visitor.OnSimpleInitializer(self, value);
         }
-        public static TResult Accept<TResult, TArg>(this Initializer.SimpleAssignInitializer self, IVisitor<TResult, TArg> visitor, TArg value) {
-            return visitor.OnSimpleAssignInitializer(self, value);
+        public static TResult Accept<TResult, TArg>(this Initializer.DesignatedInitializer self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnDesignatedInitializer(self, value);
         }
-        public static TResult Accept<TResult, TArg>(this Initializer.ArrayAssignInitializer self, IVisitor<TResult, TArg> visitor, TArg value) {
-            return visitor.OnArrayAssignInitializer(self, value);
+        public static TResult Accept<TResult, TArg>(this Initializer.ConcreteInitializer self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnConcreteInitializer(self, value);
         }
-        public static TResult Accept<TResult, TArg>(this Initializer.StructUnionAssignInitializer self, IVisitor<TResult, TArg> visitor, TArg value) {
-            return visitor.OnStructUnionAssignInitializer(self, value);
-        }
+        //public static TResult Accept<TResult, TArg>(this Initializer.SimpleAssignInitializer self, IVisitor<TResult, TArg> visitor, TArg value) {
+        //    return visitor.OnSimpleAssignInitializer(self, value);
+        //}
+        //public static TResult Accept<TResult, TArg>(this Initializer.ArrayAssignInitializer self, IVisitor<TResult, TArg> visitor, TArg value) {
+        //    return visitor.OnArrayAssignInitializer(self, value);
+        //}
+        //public static TResult Accept<TResult, TArg>(this Initializer.StructUnionAssignInitializer self, IVisitor<TResult, TArg> visitor, TArg value) {
+        //    return visitor.OnStructUnionAssignInitializer(self, value);
+        //}
         public static TResult Accept<TResult, TArg>(this Statement.BreakStatement self, IVisitor<TResult, TArg> visitor, TArg value) {
             return visitor.OnBreakStatement(self, value);
         }
