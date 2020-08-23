@@ -27,11 +27,17 @@ namespace AnsiCParser {
                     //   - その値は，0 以上でなければならず，コロン及び式が省略された場合，指定された型のオブジェクトがもつビット数を超えてはならない。
                     //   - 値が 0 の場合，その宣言に宣言子があってはならない。
                     // - ビットフィールドの型は，修飾版又は非修飾版の_Bool，signed int，unsigned int 又は他の処理系定義の型でなければならない。
-                    if (!type.Unwrap().IsBasicType(BasicType.TypeKind._Bool, BasicType.TypeKind.SignedInt, BasicType.TypeKind.UnsignedInt)) { 
-                        if (!type.Unwrap().IsBasicType(BasicType.TypeKind.SignedChar, BasicType.TypeKind.UnsignedChar, BasicType.TypeKind.Char, BasicType.TypeKind.SignedShortInt, BasicType.TypeKind.UnsignedShortInt, BasicType.TypeKind.SignedLongInt, BasicType.TypeKind.UnsignedLongInt, BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt)) {
-                            throw new CompilerException.SpecificationErrorException(ident.Range, "ビットフィールドの型は，修飾版又は非修飾版の_Bool，signed int，unsigned int 又は他の処理系定義の型でなければならない。(int型以外が使えるのは処理系依存の仕様)");
-                        }
+
+                    if (type.Unwrap().IsBasicType(BasicType.TypeKind._Bool, BasicType.TypeKind.SignedInt, BasicType.TypeKind.UnsignedInt)) {
+                        // 修飾版又は非修飾版の_Bool，signed int，unsigned int は明示的に定義されているため受理
+                    } else if (type.Unwrap().IsBasicType(BasicType.TypeKind.SignedChar, BasicType.TypeKind.UnsignedChar, BasicType.TypeKind.Char, BasicType.TypeKind.SignedShortInt, BasicType.TypeKind.UnsignedShortInt, BasicType.TypeKind.SignedLongInt, BasicType.TypeKind.UnsignedLongInt, BasicType.TypeKind.SignedLongLongInt, BasicType.TypeKind.UnsignedLongLongInt)) {
+                        // 処理系定義として受理
+                    } else if (type.Unwrap().IsEnumeratedType()) {
+                        // int型に無条件でキャストできると規定されているため受理
+                    } else {
+                        throw new CompilerException.SpecificationErrorException(ident.Range, "ビットフィールドの型は，修飾版又は非修飾版の_Bool，signed int，unsigned int 又は他の処理系定義の型でなければならない。(他の型が使えるのは処理系依存の仕様)");
                     }
+
                     if (bitWidth > type.SizeOf() * 8) {
                         throw new CompilerException.SpecificationErrorException(ident.Range, "ビットフィールドの幅の値は，指定された型のオブジェクトがもつビット数を超えてはならない。");
                     }
@@ -55,6 +61,9 @@ namespace AnsiCParser {
                 return ret;
             }
 
+            /// <summary>
+            /// ビットフィールドの型
+            /// </summary>
             public CType Type {
                 get; private set;
             }

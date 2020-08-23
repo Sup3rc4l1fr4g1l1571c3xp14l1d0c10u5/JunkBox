@@ -60,6 +60,10 @@ namespace AnsiCParser.SyntaxTree {
             return false;
         }
 
+        /// <summary>
+        /// 式が明示的な括弧でくくられているなら
+        /// </summary>
+        public bool EnclosedInParentheses { get; set; }
 
         /// <summary>
         /// 6.5.1 一次式
@@ -384,35 +388,35 @@ namespace AnsiCParser.SyntaxTree {
                 }
             }
 
-            /// <summary>
-            /// 括弧で囲まれた式
-            /// </summary>
-            /// <remarks>
-            /// 括弧で囲まれた式は，一次式とする。その型及び値は，括弧の中の式のそれらと同じとする。
-            /// 括弧の中の式が左辺値，関数指示子又はボイド式である場合，それは，それぞれ左辺値，関数指示子又はボイド式とする。
-            /// </remarks>
-            public class EnclosedInParenthesesExpression : PrimaryExpression {
-                public Expression ParenthesesExpression {
-                    get;
-                }
-                public override CType Type {
-                    get {
-                        return ParenthesesExpression.Type;
-                    }
-                }
-                public override bool IsLValue() {
-                    // 6.5.1 一次式
-                    // 括弧の中の式が左辺値である場合，それは，左辺値とする
-                    return ParenthesesExpression.IsLValue();
-                }
-                public override bool HasStorageClassRegister() {
-                    return ParenthesesExpression.HasStorageClassRegister();
-                }
+            ///// <summary>
+            ///// 括弧で囲まれた式
+            ///// </summary>
+            ///// <remarks>
+            ///// 括弧で囲まれた式は，一次式とする。その型及び値は，括弧の中の式のそれらと同じとする。
+            ///// 括弧の中の式が左辺値，関数指示子又はボイド式である場合，それは，それぞれ左辺値，関数指示子又はボイド式とする。
+            ///// </remarks>
+            //public class EnclosedInParenthesesExpression : PrimaryExpression {
+            //    public Expression ParenthesesExpression {
+            //        get;
+            //    }
+            //    public override CType Type {
+            //        get {
+            //            return ParenthesesExpression.Type;
+            //        }
+            //    }
+            //    public override bool IsLValue() {
+            //        // 6.5.1 一次式
+            //        // 括弧の中の式が左辺値である場合，それは，左辺値とする
+            //        return ParenthesesExpression.IsLValue();
+            //    }
+            //    public override bool HasStorageClassRegister() {
+            //        return ParenthesesExpression.HasStorageClassRegister();
+            //    }
 
-                public EnclosedInParenthesesExpression(LocationRange locationRange, Expression parenthesesExpression) : base(locationRange) {
-                    ParenthesesExpression = parenthesesExpression;
-                }
-            }
+            //    public EnclosedInParenthesesExpression(LocationRange locationRange, Expression parenthesesExpression) : base(locationRange) {
+            //        ParenthesesExpression = parenthesesExpression;
+            //    }
+            //}
 
 
             /// <summary>
@@ -430,6 +434,22 @@ namespace AnsiCParser.SyntaxTree {
                     Offset = offset;
                 }
 
+            }
+
+
+            /// <summary>
+            /// (C99) 複合リテラル
+            /// </summary>
+            public class CompoundLiteralExpression : Expression {
+                public override CType Type { get; }
+                public Initializer OriginalInitializer { get; }
+                public InitializeCommand[] InitializeCommands { get; }
+
+                public CompoundLiteralExpression(LocationRange locationRange, CType type, Initializer originalInitializer, InitializeCommand[] initializeCommands) : base(locationRange) {
+                    this.Type = type;
+                    this.OriginalInitializer = originalInitializer;
+                    this.InitializeCommands = initializeCommands;
+                }
             }
         }
 
@@ -1119,6 +1139,31 @@ namespace AnsiCParser.SyntaxTree {
             }
         }
 
+
+        /// <summary>
+        /// (c11) alignof演算子
+        /// </summary>
+        public class AlignofExpression : Expression {
+            public CType TypeOperand {
+                get;
+            }
+            public override CType Type {
+                get {
+                    return CType.CreateSizeT();
+                }
+            }
+
+            public AlignofExpression(LocationRange locationRange, CType operand) : base(locationRange) {
+                // 制約
+                // alignof 演算子は，関数型若しくは不完全型に対して適用してはならない。
+                // 配列型に対して使った場合は配列要素の型に対して使ったものとして考える。
+                if (operand.IsIncompleteType() || operand.IsFunctionType()) {
+                    throw new CompilerException.SpecificationErrorException(locationRange.Start, locationRange.End, "alignof 演算子は，関数型若しくは不完全型に対して適用してはならない。");
+                }
+                TypeOperand = operand;
+            }
+        }
+
         /// <summary>
         /// 6.5.4 キャスト演算子(キャスト式)
         /// </summary>
@@ -1138,6 +1183,8 @@ namespace AnsiCParser.SyntaxTree {
                     //} else {
                     // 型名がスカラ型の修飾版又は非修飾版を指定していない。
                     throw new CompilerException.SpecificationErrorException(locationRange.Start, locationRange.End, "型名が void 型を指定する場合を除いて，型名はスカラ型の修飾版又は非修飾版を指定しなければならない。");
+                    // GCC拡張なら可能
+                    // 
                     //}
                 }
 
@@ -1694,7 +1741,7 @@ namespace AnsiCParser.SyntaxTree {
                 if (!cond.Type.IsScalarType()) {
                     throw new CompilerException.SpecificationErrorException(cond.LocationRange.Start, cond.LocationRange.End, "条件演算子の第 1 オペランドの型は，スカラ型でなければならない。");
                 }
-
+                CType rt;
                 // 意味規則
                 // 第 1 オペランドを評価し，その評価の直後を副作用完了点とする。
                 // 第 1 オペランドが 0 と比較して等しくない場合だけ，第 2 オペランドを評価する。
@@ -1714,13 +1761,14 @@ namespace AnsiCParser.SyntaxTree {
                 if (thenExpr.Type.IsArithmeticType() && elseExpr.Type.IsArithmeticType()) {
                     // 制約 両オペランドの型が算術型である。
                     // 意味規則 第 2 及び第 3 オペランドの型がともに算術型ならば，通常の算術型変換をこれら二つのオペランドに適用することによって決まる型を結果の型とする。
-                    ResultType = Specification.UsualArithmeticConversion(ref thenExpr, ref elseExpr);
+                    rt = Specification.UsualArithmeticConversion(ref thenExpr, ref elseExpr);
                 } else if (thenExpr.Type.IsStructureType() && elseExpr.Type.IsStructureType() && CType.IsEqual(thenExpr.Type, elseExpr.Type)) {
                     // - 両オペランドの型が同じ構造体型又は共用体型である。
+                    rt = thenExpr.Type;
                 } else if (thenExpr.Type.IsVoidType() && elseExpr.Type.IsVoidType()) {
                     // 制約 両オペランドの型が void 型である。
                     // 意味規則 両オペランドの型がともに void  型ならば，結果の型は void 型とする。
-                    ResultType = CType.CreateVoid();
+                    rt = CType.CreateVoid();
                 } else {
                     // ポインタ型への暗黙的型変換を試みる
                     var thenExprPtr = Specification.ToPointerTypeExpr(thenExpr);
@@ -1744,7 +1792,7 @@ namespace AnsiCParser.SyntaxTree {
                         Debug.Assert(baseType != null);
                         TypeQualifier tq = thenExpr.Type.GetBasePointerType().GetTypeQualifier() | elseExpr.Type.GetBasePointerType().GetTypeQualifier();
                         baseType = baseType.WrapTypeQualifier(tq);
-                        ResultType = CType.CreatePointer(baseType);
+                        rt = CType.CreatePointer(baseType);
                     } else if (
                         (thenExprPtr != null && thenExprPtr.Type.IsPointerType() && elseExpr.IsNullPointerConstant()) ||
                         (elseExprPtr != null && elseExprPtr.Type.IsPointerType() && thenExpr.IsNullPointerConstant())
@@ -1760,7 +1808,7 @@ namespace AnsiCParser.SyntaxTree {
                         var baseType = thenExpr.IsNullPointerConstant() ? elseExpr.Type.GetBasePointerType().Unwrap() : thenExpr.Type.GetBasePointerType().Unwrap();
                         TypeQualifier tq = (thenExpr.Type.IsPointerType() ? thenExpr.Type.GetBasePointerType().GetTypeQualifier() : TypeQualifier.None) | (elseExpr.Type.IsPointerType() ? elseExpr.Type.GetBasePointerType().GetTypeQualifier() : TypeQualifier.None);
                         baseType = baseType.WrapTypeQualifier(tq);
-                        ResultType = CType.CreatePointer(baseType);
+                        rt = CType.CreatePointer(baseType);
                     } else if (
                         (thenExprPtr != null && elseExprPtr != null) &&
                         (
@@ -1776,7 +1824,7 @@ namespace AnsiCParser.SyntaxTree {
                         CType baseType = CType.CreatePointer(CType.CreateVoid());
                         TypeQualifier tq = thenExpr.Type.GetBasePointerType().GetTypeQualifier() | elseExpr.Type.GetBasePointerType().GetTypeQualifier();
                         baseType = baseType.WrapTypeQualifier(tq);
-                        ResultType = CType.CreatePointer(baseType);
+                        rt = CType.CreatePointer(baseType);
                     } else {
                         throw new CompilerException.SpecificationErrorException(thenExpr.LocationRange.Start, elseExpr.LocationRange.End, "条件演算子の第 2 及び第 3 オペランドの型がクソ長い条件を満たしていない。");
                     }
@@ -1786,6 +1834,7 @@ namespace AnsiCParser.SyntaxTree {
                 CondExpr = Specification.TypeConvert(CType.CreateBool(), cond);
                 ThenExpr = thenExpr;
                 ElseExpr = elseExpr;
+                ResultType = rt;
             }
         }
 
@@ -2186,5 +2235,6 @@ namespace AnsiCParser.SyntaxTree {
                 Expr = expr;
             }
         }
+
     }
 }

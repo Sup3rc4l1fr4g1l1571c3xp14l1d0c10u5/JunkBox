@@ -1,10 +1,12 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Threading.Tasks;
+using System.Security.Cryptography;
 using AnsiCParser.DataType;
+using AnsiCParser.Linkage;
 using AnsiCParser.SyntaxTree;
 
 namespace AnsiCParser {
@@ -22,7 +24,7 @@ namespace AnsiCParser {
                 FloatConst, // 式の結果は浮動小数点定数値である
                 Var, // 式の結果は変数参照、もしくは引数参照である（アドレス値の示す先が値である）
                 Ref, // 式の結果はオブジェクト参照である(アドレス値自体が値である)
-                Address // 式の結果はアドレス参照である（スタックの一番上に参照先自体が積まれているような想定。実際には参照先のアドレス値がある）
+                Address, // 式の結果はアドレス参照である（スタックの一番上に参照先自体が積まれているような想定。実際には参照先のアドレス値がある）
             }
 
             // v は (Var v+0) となる
@@ -1071,11 +1073,11 @@ namespace AnsiCParser {
                     Emit($"xorl    {regLo}, {regLo}");
                     return;
                 } else if (32 < cnt && cnt < 64) {
-                    Emit($"orl     {regLo}, {regHi}");
+                    Emit($"movl    {regLo}, {regHi}");
                     Emit($"xorl    {regLo}, {regLo}");
                     cnt -= 32;
                 } else if (cnt == 32) {
-                    Emit($"orl     {regLo}, {regHi}");
+                    Emit($"movl    {regLo}, {regHi}");
                     Emit($"xorl    {regLo}, {regLo}");
                     return;
                 } else if (0 < cnt && cnt < 32) {
@@ -1369,6 +1371,7 @@ namespace AnsiCParser {
                     int offsetBit = bft.BitOffset % 8;
                     int offsetByte = bft.BitOffset / 8;
                     int byteLen = (offsetBit + bft.BitWidth + 7) / 8;
+                    var isUnsigned = (bft.IsEnumeratedType() ? ((CType)(bft.Unwrap() as TaggedType.EnumType).SelectedType) : bft).IsUnsignedIntegerType();
 
                     // ビットフィールドへの代入の場合
                     LoadVariableAddress("%edi"); // ビットフィールドの起点アドレス
@@ -1384,10 +1387,9 @@ namespace AnsiCParser {
                                     UInt32 dstMask = ~(srcMask << ((int)offsetBit));
 
                                     LoadI32("%ecx");    // 右辺式の値を取り出す
-
-                                    if (!bft.IsUnsignedIntegerType()) {
+                                    if (!isUnsigned) {
                                         // ビットフィールドの最上位ビットとそれより上を値の符号ビットで埋める
-                                        Emit($"sall ${32 - bft.BitWidth}, %ecx");
+                                        Emit($"shll ${32 - bft.BitWidth}, %ecx");
                                         Emit($"sarl ${32 - bft.BitWidth}, %ecx");
                                     } else {
                                         // ビットフィールドの最上位ビットより上をを消す
@@ -1414,9 +1416,9 @@ namespace AnsiCParser {
 
                                     // 右辺式の値を %eax:%ecx にロード
                                     LoadI32("%ecx");    // 右辺式の値を取り出す
-                                    if (!bft.IsUnsignedIntegerType()) {
+                                    if (!isUnsigned) {
                                         // ビットフィールドの最上位ビットとそれより上を値の符号ビットで埋める
-                                        Emit($"sall ${32 - bft.BitWidth}, %ecx");
+                                        Emit($"shll ${32 - bft.BitWidth}, %ecx");
                                         Emit($"sarl ${32 - bft.BitWidth}, %ecx");
                                     } else {
                                         // ビットフィールドの最上位ビットより上をを消す
@@ -1450,20 +1452,25 @@ namespace AnsiCParser {
                                 break;
                             }
                         case 8: {
+                                Emit($"# bft.BitWidth = {bft.BitWidth}");
+
                                 UInt64 srcMask = bft.BitWidth == 64 ? 0xFFFFFFFFFFFFFFFFUL : (UInt64)((1UL << bft.BitWidth) - 1);
 
                                 if (byteLen <= 4) { // 書き込み先が4byte幅を超えない場合
                                     UInt64 dstMask = ~(srcMask << ((int)offsetBit));
 
+                                    Emit($"# LoadI64");
                                     LoadI64("%eax", "%edx");    // 右辺式の値を取り出す
 
-                                    if (!bft.IsUnsignedIntegerType()) {
+                                    if (!isUnsigned) {
                                         // ビットフィールドの最上位ビットとそれより上を値の符号ビットで埋める
 
                                         // value << (64 - bft.BitWidth) 相当のコード
-                                        ArithmeticLeftShift64("%eax", "%edx", 64 - bft.BitWidth);
+                                        Emit($"# LogicalLeftShift64");
+                                        LogicalLeftShift64("%eax", "%edx", 64 - bft.BitWidth);
 
                                         // value >> (64 - bft.BitWidth) 相当のコード
+                                        Emit($"# ArithmeticRightShift64");
                                         ArithmeticRightShift64("%eax", "%edx", 64 - bft.BitWidth);
 
                                     } else {
@@ -1488,24 +1495,27 @@ namespace AnsiCParser {
                                         Emit($"movb {offsetByte + i}(%edi), %cl");
                                         Emit($"andb ${(byte)(dstMask >> (i * 8))}, %cl");
                                         // ビットを結合させてから書き込む
-                                        Emit($"orb  %cl, %dl");
-                                        Emit($"movb %dl, {offsetByte + i}(%edi)");
+                                        Emit($"orb  %cl, %al");
+                                        Emit($"movb %al, {offsetByte + i}(%edi)");
                                         // 書き込んだ分だけシフト
-                                        Emit($"shrl $8, %edx");
+                                        Emit($"shrl $8, %eax");
                                     }
                                     Push(new Value { Kind = Value.ValueKind.Temp, Type = bft.Type, StackPos = _stack.Count });
                                 } else if (byteLen > 4 && byteLen <= 8) {    // 書き込み先が4byteより大きく、8byte以下の場合
                                     UInt64 dstMask = ~(srcMask << ((int)offsetBit));
 
+                                    Emit($"# LoadI64");
                                     LoadI64("%eax", "%edx");    // 右辺式の値を取り出す
 
-                                    if (!bft.IsUnsignedIntegerType()) {
+                                    if (!isUnsigned) {
                                         // ビットフィールドの最上位ビットとそれより上を値の符号ビットで埋める
 
                                         // value << (64 - bft.BitWidth) 相当のコード
-                                        ArithmeticLeftShift64("%eax", "%edx", 64 - bft.BitWidth);
+                                        Emit($"# LogicalLeftShift64");
+                                        LogicalLeftShift64("%eax", "%edx", 64 - bft.BitWidth);
 
                                         // value >> (64 - bft.BitWidth) 相当のコード
+                                        Emit($"# ArithmeticRightShift64");
                                         ArithmeticRightShift64("%eax", "%edx", 64 - bft.BitWidth);
 
                                     } else {
@@ -1552,17 +1562,18 @@ namespace AnsiCParser {
                                     UInt64 dstMaskLo = ~(srcMask << ((int)offsetBit));
                                     UInt64 dstMaskHi = ~(srcMask >> ((int)64 - offsetBit));
 
+                                    Emit($"# LoadI64(9)");
                                     LoadI64("%eax", "%edx");    // 右辺式の値を取り出す
 
-                                    if (!bft.IsUnsignedIntegerType()) {
+                                    if (!isUnsigned) {
+
                                         // ビットフィールドの最上位ビットとそれより上を値の符号ビットで埋める
 
                                         // value << (64 - bft.BitWidth) 相当のコード
-                                        ArithmeticLeftShift64("%eax", "%edx", 64 - bft.BitWidth);
+                                        LogicalLeftShift64("%eax", "%edx", 64 - bft.BitWidth);
 
                                         // value >> (64 - bft.BitWidth) 相当のコード
                                         ArithmeticRightShift64("%eax", "%edx", 64 - bft.BitWidth);
-
 
                                     } else {
                                         // ビットフィールドの最上位ビットより上を消す
@@ -1572,6 +1583,7 @@ namespace AnsiCParser {
                                     Emit("pushl %edx");
                                     Emit("pushl %eax");
 
+
                                     // ビットマスク処理
                                     Emit($"andl ${srcMask & 0xFFFFFFFF}, %eax");
                                     Emit($"andl ${srcMask >> 32}, %edx");
@@ -1580,7 +1592,7 @@ namespace AnsiCParser {
                                     Emit($"pushl %edx");
                                     Emit($"pushl %eax");
                                     Emit($"xorl  %eax,%eax");
-                                    Emit($"shrdl ${64 - offsetBit}, %edx, %eax"); // はみ出しビットが%eaxに入る
+                                    Emit($"shldl ${offsetBit}, %edx, %eax"); // はみ出しビットが%eaxに入る
                                     Emit($"movl %eax, %esi");   // はみ出し分を%esiに入れる
                                     Emit($"popl %eax");
                                     Emit($"popl %edx");
@@ -1613,7 +1625,7 @@ namespace AnsiCParser {
                                         Emit($"shrl $8, %edx");
                                     }
                                     // 書き込み(はみ出しビット)
-                                    Emit($"movi %esi, %eax");
+                                    Emit($"movl %esi, %eax");
                                     for (var i = 8; i < byteLen; i++) {
                                         // フィールドが属する領域を読み出してフィールドの範囲のビットを消す
                                         Emit($"movb {offsetByte + i}(%edi), %cl");
@@ -1841,7 +1853,7 @@ namespace AnsiCParser {
                 if (type.IsBasicType()) {
                     selftykind = (type.Unwrap() as BasicType).Kind;
                 } else if (type.IsEnumeratedType()) {
-                    selftykind = BasicType.TypeKind.SignedInt;
+                    selftykind = (type.Unwrap() as TaggedType.EnumType).SelectedType.Kind;
                 } else {
                     throw new NotImplementedException();
                 }
@@ -2471,7 +2483,7 @@ namespace AnsiCParser {
                             if (valueType.Unwrap() is BasicType) {
                                 kind = (valueType.Unwrap() as BasicType).Kind;
                             } else if (valueType.IsEnumeratedType()) {
-                                kind = BasicType.TypeKind.SignedInt;
+                                kind = ((valueType.Unwrap() as TaggedType.EnumType).SelectedType as BasicType).Kind;
                             } else if (valueType.IsPointerType()) {
                                 kind = BasicType.TypeKind.UnsignedInt;
                             } else {
@@ -2527,7 +2539,7 @@ namespace AnsiCParser {
                             if (valueType.Unwrap() is BasicType) {
                                 kind = (valueType.Unwrap() as BasicType).Kind;
                             } else if (valueType.IsEnumeratedType()) {
-                                kind = BasicType.TypeKind.SignedInt;
+                                kind = ((valueType.Unwrap() as TaggedType.EnumType).SelectedType as BasicType).Kind;
                             } else if (valueType.IsPointerType()) {
                                 kind = BasicType.TypeKind.UnsignedInt;
                             } else {
@@ -2684,8 +2696,8 @@ namespace AnsiCParser {
                                                     throw new Exception();
                                             }
 
-
-                                            if (!bft.IsUnsignedIntegerType()) {
+                                            var bft2 = bft.IsEnumeratedType() ? ((CType)(bft.Unwrap() as TaggedType.EnumType).SelectedType) : bft;
+                                            if (!bft2.IsUnsignedIntegerType()) {
                                                 // ビットフィールドの最上位ビットとそれより上を値の符号ビットで埋める
                                                 Emit($"shll ${32 - bft.BitWidth}, {register}");
                                                 Emit($"sarl ${32 - bft.BitWidth}, {register}");
@@ -2697,7 +2709,7 @@ namespace AnsiCParser {
                                         throw new NotSupportedException();
                                 }
                             } else {
-                                if (valueType.IsSignedIntegerType() || valueType.IsBasicType(BasicType.TypeKind.Char) || valueType.IsEnumeratedType()) {
+                                if (valueType.IsSignedIntegerType() || valueType.IsBasicType(BasicType.TypeKind.Char) || (valueType.IsEnumeratedType() && (valueType.Unwrap() as TaggedType.EnumType).SelectedType.IsSignedIntegerType())) {
                                     switch (valueType.SizeOf()) {
                                         case 1:
                                             op = "movsbl";
@@ -2711,7 +2723,7 @@ namespace AnsiCParser {
                                         default:
                                             throw new NotImplementedException();
                                     }
-                                } else if (valueType.IsUnsignedIntegerType()) {
+                                } else if (valueType.IsUnsignedIntegerType() || (valueType.IsEnumeratedType() && (valueType.Unwrap() as TaggedType.EnumType).SelectedType.IsUnsignedIntegerType())) {
                                     switch (valueType.SizeOf()) {
                                         case 1:
                                             op = "movzbl";
@@ -2862,16 +2874,18 @@ namespace AnsiCParser {
                                 UInt32 srcMaskLo = (UInt32)(srcMask & 0xFFFFFFFFUL);
                                 UInt32 srcMaskHi = (UInt32)(srcMask >> 32);
                                 int byteLen = (offsetBit + bft.BitWidth + 7) / 8;
+                                var isUnsigned = (bft.IsEnumeratedType() ? ((CType)(bft.Unwrap() as TaggedType.EnumType).SelectedType) : bft).IsUnsignedIntegerType();
+
                                 switch (byteLen) {
                                     case 1: {
                                             var byteReg = ToByteReg(regLo);
                                             Emit($"movb {src(offsetByte)}, {byteReg}");
-                                            if (!bft.IsUnsignedIntegerType()) {
+                                            if (!isUnsigned) {
                                                 Emit($"shlb ${8 - (offsetBit + bft.BitWidth)}, {byteReg}");
                                                 Emit($"sarb ${(8 - (offsetBit + bft.BitWidth)) + offsetBit}, {byteReg}");
                                                 Emit($"movsbl {byteReg}, {regLo}");
                                                 Emit($"movl {regLo}, {regHi}");
-                                                Emit($"sall $31, {regHi}");
+                                                Emit($"sarl $31, {regHi}");
                                             } else {
                                                 Emit($"shlb ${8 - (offsetBit + bft.BitWidth)}, {byteReg}");
                                                 Emit($"shrb ${(8 - (offsetBit + bft.BitWidth)) + offsetBit}, {byteReg}");
@@ -2883,12 +2897,12 @@ namespace AnsiCParser {
                                     case 2: {
                                             var wordReg = ToWordReg(regLo);
                                             Emit($"movw {src(offsetByte)}, {wordReg}");
-                                            if (!bft.IsUnsignedIntegerType()) {
+                                            if (!isUnsigned) {
                                                 Emit($"shlw ${16 - (offsetBit + bft.BitWidth)}, {wordReg}");
                                                 Emit($"sarw ${(16 - (offsetBit + bft.BitWidth)) + offsetBit}, {wordReg}");
                                                 Emit($"movswl {wordReg}, {regLo}");
                                                 Emit($"movl {regLo}, {regHi}");
-                                                Emit($"sall $31, {regHi}");
+                                                Emit($"sarl $31, {regHi}");
                                             } else {
                                                 Emit($"shlw ${16 - (offsetBit + bft.BitWidth)}, {wordReg}");
                                                 Emit($"shrw ${(16 - (offsetBit + bft.BitWidth)) + offsetBit}, {wordReg}");
@@ -2899,16 +2913,17 @@ namespace AnsiCParser {
                                         }
                                     case 3: {
                                             var byteReg = ToByteReg(regLo);
+                                            Emit($"xorl {regLo}, {regLo}");
                                             Emit($"movb {src(offsetByte + 2)}, {byteReg}");
                                             Emit($"shll $16, {regLo}");
                                             var wordReg = ToWordReg(regLo);
                                             Emit($"movw {src(offsetByte)}, {wordReg}");
 
-                                            if (!bft.IsUnsignedIntegerType()) {
+                                            if (!isUnsigned) {
                                                 Emit($"shll ${32 - (offsetBit + bft.BitWidth)}, {regLo}");
                                                 Emit($"sarl ${(32 - (offsetBit + bft.BitWidth)) + offsetBit}, {regLo}");
                                                 Emit($"movl {regLo}, {regHi}");
-                                                Emit($"sall $31, {regLo}");
+                                                Emit($"sarl $31, {regHi}");
                                             } else {
                                                 Emit($"shll ${32 - (offsetBit + bft.BitWidth)}, {regLo}");
                                                 Emit($"shrl ${(32 - (offsetBit + bft.BitWidth)) + offsetBit}, {regLo}");
@@ -2919,11 +2934,11 @@ namespace AnsiCParser {
                                     case 4: {
                                             Emit($"movl {src(offsetByte)}, {regLo}");
                                             // フィールドが属する領域を読み出し右詰してから、無関係のビットを消す
-                                            if (!bft.IsUnsignedIntegerType()) {
+                                            if (!isUnsigned) {
                                                 Emit($"shll ${32 - (offsetBit + bft.BitWidth)}, {regLo}");
                                                 Emit($"sarl ${(32 - (offsetBit + bft.BitWidth)) + offsetBit}, {regLo}");
                                                 Emit($"movl {regLo}, {regHi}");
-                                                Emit($"sall $31, {regLo}");
+                                                Emit($"sarl $31, {regHi}");
                                             } else {
                                                 Emit($"shll ${32 - (offsetBit + bft.BitWidth)}, {regLo}");
                                                 Emit($"shrl ${(32 - (offsetBit + bft.BitWidth)) + offsetBit}, {regLo}");
@@ -2968,7 +2983,7 @@ namespace AnsiCParser {
                                             Emit($"movl {src(offsetByte)}, {regLo}");
 
                                             LogicalLeftShift64(regLo, regHi, 64 - (offsetBit + bft.BitWidth));
-                                            if (!bft.IsUnsignedIntegerType()) {
+                                            if (!isUnsigned) {
                                                 ArithmeticRightShift64(regLo, regHi, 64 - (offsetBit + bft.BitWidth) + offsetBit);
                                             } else {
                                                 LogicalRightShift64(regLo, regHi, 64 - (offsetBit + bft.BitWidth) + offsetBit);
@@ -3000,7 +3015,7 @@ namespace AnsiCParser {
                                             Emit($"popl {regHi}");
 
                                             LogicalLeftShift64(regLo, regHi, 64 - (bft.BitWidth));
-                                            if (!bft.IsUnsignedIntegerType()) {
+                                            if (!isUnsigned) {
                                                 ArithmeticRightShift64(regLo, regHi, 64 - (bft.BitWidth));
                                             } else {
                                                 LogicalRightShift64(regLo, regHi, 64 - (bft.BitWidth));
@@ -3341,6 +3356,7 @@ namespace AnsiCParser {
 
                             BitFieldType bft;
                             if (value.Type.IsBitField(out bft)) {
+                                var isUnsigned = (bft.IsEnumeratedType() ? ((CType)(bft.Unwrap() as TaggedType.EnumType).SelectedType) : bft).IsUnsignedIntegerType();
 #if false
                                 // ビットフィールドなので
                                 switch (bft.SizeOf()) {
@@ -3403,7 +3419,7 @@ namespace AnsiCParser {
                                                 case 1: {
                                                         var byteReg = ToByteReg(register);
                                                         Emit($"movb {offsetByte}{src}, {byteReg}");
-                                                        if (!bft.IsUnsignedIntegerType()) {
+                                                        if (!isUnsigned) {
                                                             Emit($"shlb ${8 - (offsetBit + bft.BitWidth)}, {byteReg}");
                                                             Emit($"sarb ${(8 - (offsetBit + bft.BitWidth)) + offsetBit}, {byteReg}");
                                                             Emit($"movsbl {byteReg}, {register}");
@@ -3417,7 +3433,7 @@ namespace AnsiCParser {
                                                 case 2: {
                                                         var wordReg = ToWordReg(register);
                                                         Emit($"movw {offsetByte}{src}, {wordReg}");
-                                                        if (!bft.IsUnsignedIntegerType()) {
+                                                        if (!isUnsigned) {
                                                             Emit($"shlw ${16 - (offsetBit + bft.BitWidth)}, {wordReg}");
                                                             Emit($"sarw ${(16 - (offsetBit + bft.BitWidth)) + offsetBit}, {wordReg}");
                                                             Emit($"movswl {wordReg}, {register}");
@@ -3435,7 +3451,7 @@ namespace AnsiCParser {
                                                         var wordReg = ToWordReg(register);
                                                         Emit($"movw {offsetByte}{src}, {wordReg}");
 
-                                                        if (!bft.IsUnsignedIntegerType()) {
+                                                        if (!isUnsigned) {
                                                             Emit($"shll ${32 - (offsetBit + bft.BitWidth)}, {register}");
                                                             Emit($"sarl ${(32 - (offsetBit + bft.BitWidth)) + offsetBit}, {register}");
                                                         } else {
@@ -3446,7 +3462,7 @@ namespace AnsiCParser {
                                                     }
                                                 case 4: {
                                                         Emit($"movl {offsetByte}{src}, {register}");
-                                                        if (!bft.IsUnsignedIntegerType()) {
+                                                        if (!isUnsigned) {
                                                             Emit($"shll ${32 - (offsetBit + bft.BitWidth)}, {register}");
                                                             Emit($"sarl ${(32 - (offsetBit + bft.BitWidth)) + offsetBit}, {register}");
                                                         } else {
@@ -3472,7 +3488,7 @@ namespace AnsiCParser {
                                                         Emit($"orl (%esp), {register}");
                                                         Emit($"addl $4, %esp");
 
-                                                        if (!bft.IsUnsignedIntegerType()) {
+                                                        if (!isUnsigned) {
                                                             Emit($"shll ${32 - (bft.BitWidth)}, {register}");
                                                             Emit($"sarl ${(32 - (bft.BitWidth)) }, {register}");
                                                         } else {
@@ -3486,7 +3502,7 @@ namespace AnsiCParser {
                                             }
 
 
-                                            if (!bft.IsUnsignedIntegerType()) {
+                                            if (!isUnsigned) {
                                                 // ビットフィールドの最上位ビットとそれより上を値の符号ビットで埋める
                                                 Emit($"shll ${32 - bft.BitWidth}, {register}");
                                                 Emit($"sarl ${32 - bft.BitWidth}, {register}");
@@ -3513,12 +3529,12 @@ namespace AnsiCParser {
                                                 case 1: {
                                                         var byteReg = ToByteReg(regLo);
                                                         Emit($"movb {offsetByte}{src}, {byteReg}");
-                                                        if (!bft.IsUnsignedIntegerType()) {
+                                                        if (!isUnsigned) {
                                                             Emit($"shlb ${8 - (offsetBit + bft.BitWidth)}, {byteReg}");
                                                             Emit($"sarb ${(8 - (offsetBit + bft.BitWidth)) + offsetBit}, {byteReg}");
                                                             Emit($"movsbl {byteReg}, {regLo}");
                                                             Emit($"movl {regLo}, {regHi}");
-                                                            Emit($"sall $31, {regHi}");
+                                                            Emit($"sarl $31, {regHi}");
                                                         } else {
                                                             Emit($"shlb ${8 - (offsetBit + bft.BitWidth)}, {byteReg}");
                                                             Emit($"shrb ${(8 - (offsetBit + bft.BitWidth)) + offsetBit}, {byteReg}");
@@ -3530,12 +3546,12 @@ namespace AnsiCParser {
                                                 case 2: {
                                                         var wordReg = ToWordReg(regLo);
                                                         Emit($"movw {offsetByte}{src}, {wordReg}");
-                                                        if (!bft.IsUnsignedIntegerType()) {
+                                                        if (!isUnsigned) {
                                                             Emit($"shlw ${16 - (offsetBit + bft.BitWidth)}, {wordReg}");
                                                             Emit($"sarw ${(16 - (offsetBit + bft.BitWidth)) + offsetBit}, {wordReg}");
                                                             Emit($"movswl {wordReg}, {regLo}");
                                                             Emit($"movl {regLo}, {regHi}");
-                                                            Emit($"sall $31, {regHi}");
+                                                            Emit($"sarl $31, {regHi}");
                                                         } else {
                                                             Emit($"shlw ${16 - (offsetBit + bft.BitWidth)}, {wordReg}");
                                                             Emit($"shrw ${(16 - (offsetBit + bft.BitWidth)) + offsetBit}, {wordReg}");
@@ -3551,11 +3567,11 @@ namespace AnsiCParser {
                                                         var wordReg = ToWordReg(regLo);
                                                         Emit($"movw {offsetByte}{src}, {wordReg}");
 
-                                                        if (!bft.IsUnsignedIntegerType()) {
+                                                        if (!isUnsigned) {
                                                             Emit($"shll ${32 - (offsetBit + bft.BitWidth)}, {regLo}");
                                                             Emit($"sarl ${(32 - (offsetBit + bft.BitWidth)) + offsetBit}, {regLo}");
                                                             Emit($"movl {regLo}, {regHi}");
-                                                            Emit($"sall $31, {regLo}");
+                                                            Emit($"sarl $31, {regHi}");
                                                         } else {
                                                             Emit($"shll ${32 - (offsetBit + bft.BitWidth)}, {regLo}");
                                                             Emit($"shrl ${(32 - (offsetBit + bft.BitWidth)) + offsetBit}, {regLo}");
@@ -3566,11 +3582,11 @@ namespace AnsiCParser {
                                                 case 4: {
                                                         Emit($"movl {offsetByte}{src}, {regLo}");
                                                         // フィールドが属する領域を読み出し右詰してから、無関係のビットを消す
-                                                        if (!bft.IsUnsignedIntegerType()) {
+                                                        if (!isUnsigned) {
                                                             Emit($"shll ${32 - (offsetBit + bft.BitWidth)}, {regLo}");
                                                             Emit($"sarl ${(32 - (offsetBit + bft.BitWidth)) + offsetBit}, {regLo}");
                                                             Emit($"movl {regLo}, {regHi}");
-                                                            Emit($"sall $31, {regLo}");
+                                                            Emit($"sarl $31, {regHi}");
                                                         } else {
                                                             Emit($"shll ${32 - (offsetBit + bft.BitWidth)}, {regLo}");
                                                             Emit($"shrl ${(32 - (offsetBit + bft.BitWidth)) + offsetBit}, {regLo}");
@@ -3615,7 +3631,7 @@ namespace AnsiCParser {
                                                         Emit($"movl {offsetByte}{src}, {regLo}");
 
                                                         LogicalLeftShift64(regLo, regHi, 64 - (offsetBit + bft.BitWidth));
-                                                        if (!bft.IsUnsignedIntegerType()) {
+                                                        if (!isUnsigned) {
                                                             ArithmeticRightShift64(regLo, regHi, 64 - (offsetBit + bft.BitWidth) + offsetBit);
                                                         } else {
                                                             LogicalRightShift64(regLo, regHi, 64 - (offsetBit + bft.BitWidth) + offsetBit);
@@ -3647,7 +3663,7 @@ namespace AnsiCParser {
                                                         Emit($"popl {regHi}");
 
                                                         LogicalLeftShift64(regLo, regHi, 64 - (bft.BitWidth));
-                                                        if (!bft.IsUnsignedIntegerType()) {
+                                                        if (!isUnsigned) {
                                                             ArithmeticRightShift64(regLo, regHi, 64 - (bft.BitWidth));
                                                         } else {
                                                             LogicalRightShift64(regLo, regHi, 64 - (bft.BitWidth));
@@ -4137,7 +4153,196 @@ namespace AnsiCParser {
             }
 
             private void PrefixOp(CType type, string op) {
-                if (type.IsBoolType()) {
+                BitFieldType bft;
+                if (type.IsBitField(out bft)) {
+
+                    int offsetBit = bft.BitOffset % 8;
+                    int offsetByte = bft.BitOffset / 8;
+                    UInt32 srcMask = bft.BitWidth == 32 ? 0xFFFFFFFFU : (UInt32)((1U << bft.BitWidth) - 1);
+                    int byteLen = (offsetBit + bft.BitWidth + 7) / 8;
+                    var isUnsigned = (bft.IsEnumeratedType() ? ((CType)(bft.Unwrap() as TaggedType.EnumType).SelectedType) : bft).IsUnsignedIntegerType();
+
+
+                    var baseAddr = "(%edi)";
+                    var bfValue = "%ecx";
+
+                    // ビットフィールドの起点アドレスをediに読み込む
+                    LoadVariableAddress("%edi");
+
+                    // ビットフィールドの値を読み出す
+                    switch (bft.Type.SizeOf()) {
+                        case 1:
+                        case 2:
+                        case 3:
+                        case 4: {
+
+                                // フィールドが属する領域を読み出し右詰してから、無関係のビットを消す
+                                switch (byteLen) {
+                                    case 1: {
+                                            var byteReg = ToByteReg(bfValue);
+                                            Emit($"movb {offsetByte}{baseAddr}, {byteReg}");
+
+                                            Emit($"shrl ${offsetBit}, {bfValue}");
+                                            Emit($"andl ${srcMask}, {bfValue}");
+                                            break;
+                                        }
+                                    case 2: {
+                                            var wordReg = ToWordReg(bfValue);
+                                            Emit($"movw {offsetByte}{baseAddr}, {wordReg}");
+
+                                            Emit($"shrl ${offsetBit}, {bfValue}");
+                                            Emit($"andl ${srcMask}, {bfValue}");
+                                            break;
+                                        }
+                                    case 3: {
+                                            var byteReg = ToByteReg(bfValue);
+                                            Emit($"movb {offsetByte + 2}{baseAddr}, {byteReg}");
+                                            Emit($"shll $16, {bfValue}");
+                                            var wordReg = ToWordReg(bfValue);
+                                            Emit($"movw {offsetByte}{baseAddr}, {wordReg}");
+
+                                            Emit($"shrl ${offsetBit}, {bfValue}");
+                                            Emit($"andl ${srcMask}, {bfValue}");
+                                            break;
+                                        }
+                                    case 4: {
+                                            Emit($"# ビットフィールド読み出し");
+                                            Emit($"movl {offsetByte}{baseAddr}, {bfValue}");
+                                            // フィールドが属する領域を読み出し右詰してから、無関係のビットを消す
+                                            Emit($"shrl ${offsetBit}, {bfValue}");
+                                            Emit($"andl ${srcMask}, {bfValue}");
+                                            break;
+                                        }
+                                    case 5: {
+                                            // -----yyy xxxxxxxx xxxxxxxx xxxxxxxx zzzzz---を読み込む
+                                            // -----yyyを読み込み、yyy00000 00000000 00000000 00000000 にしてスタックに積む
+                                            // xxxxxxxx xxxxxxxx xxxxxxxx zzzzz---を読み込み、000xxxxx xxxxxxxx xxxxxxxx xxxzzzzz にする
+                                            // スタック上のyyy00000 00000000 00000000 00000000とレジスタ上の000xxxxx xxxxxxxx xxxxxxxx xxxzzzzzのorを取る
+                                            // スタック上のyyy00000 00000000 00000000 00000000を放棄
+
+                                            var byteReg = ToByteReg(bfValue);
+                                            Emit($"movb {offsetByte + 4}{baseAddr}, {byteReg}");
+                                            Emit($"shll ${32 - offsetBit}, {bfValue}");
+                                            Emit($"pushl {bfValue}");
+
+                                            Emit($"movl {offsetByte}{baseAddr}, {bfValue}");
+
+                                            Emit($"shrl ${offsetBit}, {bfValue}");
+                                            Emit($"orl (%esp), {bfValue}");
+                                            Emit($"addl $4, %esp");
+
+                                            Emit($"andl ${srcMask}, {bfValue}");
+                                            break;
+                                        }
+                                    default:
+                                        throw new Exception();
+                                }
+
+                                var bft2 = bft.IsEnumeratedType() ? ((CType)(bft.Unwrap() as TaggedType.EnumType).SelectedType) : bft;
+                                if (!bft2.IsUnsignedIntegerType()) {
+                                    // ビットフィールドの最上位ビットとそれより上を値の符号ビットで埋める
+                                    Emit($"shll ${32 - bft.BitWidth}, {bfValue}");
+                                    Emit($"sarl ${32 - bft.BitWidth}, {bfValue}");
+                                }
+
+                                break;
+                            }
+                        default:
+#warning "64bitビットフィールドには非対応"
+                            throw new NotSupportedException();
+                    }
+
+                    // ビットフィールドの値が bfValue に格納されている。
+                    {
+                        if (bft.IsBoolType()) {
+                            if (op == "add") {
+                                Emit($"movl $1, {bfValue}");
+                            } else {
+                                Emit($"xorl $1, {bfValue}");
+                            }
+
+                        } else if (type.IsIntegerType()) {
+
+                            Emit($"{op}l $1, {bfValue}");
+
+                            // ビットフィールドの範囲にクリップする
+                            if (!isUnsigned) {
+                                // ビットフィールドの最上位ビットとそれより上を値の符号ビットで埋める
+                                Emit($"sall ${32 - bft.BitWidth}, {bfValue}");
+                                Emit($"sarl ${32 - bft.BitWidth}, {bfValue}");
+                            } else {
+                                // ビットフィールドの最上位ビットより上をを消す
+                                Emit($"andl ${srcMask}, {bfValue}");
+                            }
+
+                        } else {
+                            throw new Exception();
+                        }
+                    }
+
+                    // 演算後の値を計算結果にする
+                    Emit($"pushl {bfValue}");
+                    Push(new Value { Kind = Value.ValueKind.Temp, Type = type, StackPos = _stack.Count });
+
+                    // ビットフィールドへ値を書き込む 
+
+                    switch (bft.Type.SizeOf()) {
+                        case 1:
+                        case 2:
+                        case 4: {
+                                //UInt32 srcMask = bft.BitWidth == 32 ? 0xFFFFFFFFU : (UInt32)((1U << bft.BitWidth) - 1);
+
+                                if (byteLen <= 4) { // 書き込み先が4byte幅を超えない場合
+                                    UInt32 dstMask = ~(srcMask << ((int)offsetBit));
+
+                                    // ビットマスク処理と位置合わせ
+                                    Emit($"andl ${srcMask}, {bfValue}");
+                                    Emit($"shll ${offsetBit}, {bfValue}");
+
+                                    var byteReg = ToByteReg(bfValue);
+                                    for (var i = 0; i < byteLen; i++) {
+                                        // フィールドが属する領域を読み出してフィールドの範囲のビットを消す
+                                        Emit($"movb {offsetByte + i}{baseAddr}, %dl");
+                                        Emit($"andb ${(byte)(dstMask >> (i * 8))}, %dl");
+                                        // ビットを結合させてから書き込む
+                                        Emit($"orb  %dl, {byteReg}");
+                                        Emit($"movb {byteReg}, {offsetByte + i}{baseAddr}");
+                                        // 書き込んだ分だけシフト
+                                        Emit($"shrl $8, {bfValue}");
+                                    }
+                                } else {    // 書き込み先が4byte幅を超える場合
+                                    UInt64 dstMask = ~((UInt64)srcMask << ((int)offsetBit));
+
+                                    // 右辺式の値をビットマスク処理と位置合わせして %eax:bfValue にロード
+                                    Emit($"andl ${srcMask}, {bfValue}");
+                                    Emit($"movl {bfValue}, %eax");
+                                    Emit($"shrl ${32 - offsetBit}, %eax");
+                                    Emit($"shll ${offsetBit}, {bfValue}");
+
+                                    // スタック上に書き込みデータを作って合成させる
+                                    Emit($"pushl %eax");
+                                    Emit($"pushl {bfValue}");
+                                    Emit($"movl  %esp, %esi");
+                                    var byteReg = ToByteReg(bfValue);
+                                    for (var i = 0; i < byteLen; i++) {
+                                        // フィールドが属する領域を読み出してフィールドの範囲のビットを消す
+                                        Emit($"movb {offsetByte + i}{baseAddr}, %dl");
+                                        Emit($"andb ${(byte)(dstMask >> (i * 8))}, %dl");
+                                        // ビットを結合させてから書き込む
+                                        Emit($"movb {i}(%esi), {byteReg}");
+                                        Emit($"orb  %dl, {byteReg}");
+                                        Emit($"movb {byteReg}, {offsetByte + i}{baseAddr}");
+                                    }
+                                    Emit($"addl $8, %esp");
+                                }
+                                break;
+                            }
+                        default:
+#warning "64bitビットフィールドには非対応"
+                            throw new NotSupportedException();
+                    }
+
+                } else if (type.IsBoolType()) {
 
                     LoadVariableAddress("%eax");
 
@@ -4386,7 +4591,85 @@ namespace AnsiCParser {
 
         }
 
+        protected static class InitializeCommandsResolver {
+            /// <summary>
+            /// 初期化情報
+            /// </summary>
+            public struct ValueEntry {
+                public int ByteOffset { get; }
+                public int BitOffset { get; }
+                public int BitSize { get; }
+                public Expression Expr { get; }
 
+                public ValueEntry(int byteOffset, int bitOffset, int bitSize, Expression expr) {
+                    this.ByteOffset = byteOffset;
+                    this.BitOffset = bitOffset;
+                    this.BitSize = bitSize;
+                    this.Expr = expr;
+                }
+            }
+
+            public static void Resolve(InitializeCommand[] initializeCommands, int offset, List<ValueEntry> _initValues) {
+                foreach (var commands in initializeCommands) {
+                    var r = PathResolver.ResolvePath(commands.path);
+                    var ret = ExpressionEvaluator.Eval(commands.expr);
+                    if (ret is Expression.PrimaryExpression.CompoundLiteralExpression) {
+                        var ce = ret as Expression.PrimaryExpression.CompoundLiteralExpression;
+                        Resolve(ce.InitializeCommands, r.Item2 + offset, _initValues);
+                    } else {
+                        var ty = r.Item1;
+                        var offsetByte = r.Item2 + offset;
+                        var offsetBit = ty.IsBitField() ? ((DataType.BitFieldType)ty).BitOffset : -1;
+                        var bitWidth = ty.IsBitField() ? ((DataType.BitFieldType)ty).BitWidth : -1;
+                        _initValues.Add(new ValueEntry(offsetByte, offsetBit, bitWidth, ret));
+                    }
+                }
+            }
+
+            public  static List<ValueEntry> Padding(List<ValueEntry> entries, CType ty) {
+                var ret = new List<ValueEntry>();
+                var currentByteOffset = 0;
+                var currentBitOffset = -1;
+                for (var i = 0; i < entries.Count; i++) {
+                    var val = entries[i];
+
+                    if (val.BitOffset != -1) {
+                        // ビットフィールドの範囲にはパディングを入れない
+                        while (i < entries.Count) {
+                            var v = entries[i];
+                            if (v.BitOffset == -1) {
+                                break;
+                            }
+                            var e = new ValueEntry(v.ByteOffset, v.BitOffset, v.BitSize, v.Expr);
+                            ret.Add(e);
+                            currentByteOffset = v.ByteOffset + (v.BitOffset + v.BitSize + 7) / 8;
+
+                            i++;
+                        }
+                        i -= 1;
+                        continue;
+                    }
+
+
+                    if (currentByteOffset < val.ByteOffset) {
+                        for (var j = currentByteOffset; j < val.ByteOffset; j++) {
+                            var e = new ValueEntry(j, -1, -1, new Expression.PrimaryExpression.Constant.IntegerConstant(LocationRange.Builtin, "0", 0, BasicType.TypeKind.UnsignedChar));
+                            ret.Add(e);
+                        }
+                    }
+                    ret.Add(val);
+                    currentByteOffset = val.ByteOffset + val.Expr.Type.SizeOf();
+                }
+                if (currentByteOffset < ty.SizeOf()) {
+                    for (var j = currentByteOffset; j < ty.SizeOf(); j++) {
+                        var e = new ValueEntry(j, -1, -1, new Expression.PrimaryExpression.Constant.IntegerConstant(LocationRange.Builtin, "0", 0, BasicType.TypeKind.UnsignedChar));
+                        ret.Add(e);
+                    }
+                }
+                return ret;
+            }
+
+        }
 
 
 
@@ -4488,7 +4771,7 @@ namespace AnsiCParser {
                     _context.Emit("# location:");
                     _context.Emit($"#   {self.LocationRange}");
                     _context.Emit(".section .text");
-                    if (self.LinkageObject.Linkage == LinkageKind.ExternalLinkage) {
+                    if (self.LinkageObject.Linkage == Kind.ExternalLinkage) {
                         _context.Emit($".globl {self.LinkageObject.LinkageId}");
                     }
                     _context.Emit($"{self.LinkageObject.LinkageId}:");
@@ -4521,7 +4804,7 @@ namespace AnsiCParser {
 
             public Value OnVariableDeclaration(Declaration.VariableDeclaration self, Value value) {
                 // ブロックスコープ変数
-                if (self.LinkageObject.Linkage == LinkageKind.NoLinkage && self.StorageClass != StorageClassSpecifier.Static) {
+                if (self.LinkageObject.Linkage == Kind.NoLinkage && self.StorageClass != StorageClassSpecifier.Static) {
                     if (self.Init != null) {
                         Tuple<string, int> offset;
                         if (_localScope.TryGetValue(self.Ident, out offset) == false) {
@@ -4529,6 +4812,13 @@ namespace AnsiCParser {
                         }
 
                         _context.Emit($"# {self.LocationRange}");
+
+                        _context.Emit($"xorl %eax, %eax");
+                        _context.Emit($"leal {offset.Item2}(%ebp), %edi");
+                        _context.Emit($"movl ${self.Type.SizeOf()}, %ecx");
+                        _context.Emit("cld");
+                        _context.Emit("rep stosb");
+
                         return self.Init.Accept(this, new Value { Kind = Value.ValueKind.Var, Label = offset.Item1, Offset = offset.Item2, Type = self.Type });
                     }
                 }
@@ -4867,9 +5157,9 @@ namespace AnsiCParser {
                 return value;
             }
 
-            public Value OnEnclosedInParenthesesExpression(Expression.PrimaryExpression.EnclosedInParenthesesExpression self, Value value) {
-                return self.ParenthesesExpression.Accept(this, value);
-            }
+            //public Value OnEnclosedInParenthesesExpression(Expression.PrimaryExpression.EnclosedInParenthesesExpression self, Value value) {
+            //    return self.ParenthesesExpression.Accept(this, value);
+            //}
 
             public Value OnAddressConstantExpression(Expression.PrimaryExpression.AddressConstantExpression self, Value value) {
                 self.Identifier.Accept(this, value);
@@ -4897,7 +5187,7 @@ namespace AnsiCParser {
             }
 
             public Value OnVariableExpression(Expression.PrimaryExpression.IdentifierExpression.VariableExpression self, Value value) {
-                if (self.Decl.LinkageObject.Linkage == LinkageKind.NoLinkage) {
+                if (self.Decl.LinkageObject.Linkage == Kind.NoLinkage) {
                     Tuple<string, int> offset;
                     if (_localScope.TryGetValue(self.Ident, out offset)) {
                         _context.Push(new Value { Kind = Value.ValueKind.Var, Type = self.Type, Label = offset.Item1, Offset = offset.Item2 });
@@ -5049,12 +5339,13 @@ namespace AnsiCParser {
                     var v = new Value(value) { Type = r.Item1 };
                     v.Offset += r.Item2;
                     commands.expr.Accept(this, v);
+                    _context.Push(v);
+                    _context.Assign(r.Item1);
+                    _context.Discard();
                 }
                 return value;
                 //throw new NotImplementedException("self.InitializeCommands を解析して初期化を行う処理を挿入");
             }
-
-
 
             //public Value OnSimpleAssignInitializer(Initializer.SimpleAssignInitializer self, Value value) {
             //    self.Expr.Accept(this, value);
@@ -5188,7 +5479,7 @@ namespace AnsiCParser {
 
                 _context.Emit("# enter scope");
                 foreach (var x in self.Decls.Reverse<Declaration>()) {
-                    if (x.LinkageObject.Linkage == LinkageKind.NoLinkage) {
+                    if (x.LinkageObject.Linkage == Kind.NoLinkage) {
                         if (x.StorageClass == StorageClassSpecifier.Static) {
                             // static
                             _localScope.Add(x.Ident, Tuple.Create(x.LinkageObject.LinkageId, 0));
@@ -5198,10 +5489,10 @@ namespace AnsiCParser {
                             _localScope.Add(x.Ident, Tuple.Create((string)null, -_localScopeTotalSize));
                             _context.Emit($"# auto  : name={x.Ident} address={-_localScopeTotalSize}(%ebp) type={x.Type.ToString()}");
                         }
-                    } else if (x.LinkageObject.Linkage == LinkageKind.ExternalLinkage) {
+                    } else if (x.LinkageObject.Linkage == Kind.ExternalLinkage) {
                         _context.Emit($"# extern: name={x.Ident} linkid={x.LinkageObject.LinkageId} type={x.Type.ToString()}");
                         // externなのでスキップ
-                    } else if (x.LinkageObject.Linkage == LinkageKind.InternalLinkage) {
+                    } else if (x.LinkageObject.Linkage == Kind.InternalLinkage) {
                         _context.Emit($"# internal(filescope): name={x.Ident} linkid={x.LinkageObject.LinkageId} type={x.Type.ToString()}");
                         // externなのでスキップ
                     } else {
@@ -5235,7 +5526,7 @@ namespace AnsiCParser {
 
                 _context.Emit("# enter scope");
                 foreach (var x in self.DeclsOrStmts.Where(x => x is Declaration).Cast<Declaration>().Reverse<Declaration>()) {
-                    if (x.LinkageObject.Linkage == LinkageKind.NoLinkage) {
+                    if (x.LinkageObject.Linkage == Kind.NoLinkage) {
                         if (x.StorageClass == StorageClassSpecifier.Static) {
                             // static
                             _localScope.Add(x.Ident, Tuple.Create(x.LinkageObject.LinkageId, 0));
@@ -5245,10 +5536,10 @@ namespace AnsiCParser {
                             _localScope.Add(x.Ident, Tuple.Create((string)null, -_localScopeTotalSize));
                             _context.Emit($"# auto  : name={x.Ident} address={-_localScopeTotalSize}(%ebp) type={x.Type.ToString()}");
                         }
-                    } else if (x.LinkageObject.Linkage == LinkageKind.ExternalLinkage) {
+                    } else if (x.LinkageObject.Linkage == Kind.ExternalLinkage) {
                         _context.Emit($"# extern: name={x.Ident} linkid={x.LinkageObject.LinkageId} type={x.Type.ToString()}");
                         // externなのでスキップ
-                    } else if (x.LinkageObject.Linkage == LinkageKind.InternalLinkage) {
+                    } else if (x.LinkageObject.Linkage == Kind.InternalLinkage) {
                         _context.Emit($"# internal(filescope): name={x.Ident} linkid={x.LinkageObject.LinkageId} type={x.Type.ToString()}");
                         // externなのでスキップ
                     } else {
@@ -5496,6 +5787,38 @@ namespace AnsiCParser {
                 throw new NotImplementedException();
             }
 
+            public Value OnCompoundLiteralExpression(Expression.PrimaryExpression.CompoundLiteralExpression self, Value value) {
+#warning "要確認"
+                // テンポラリ変数を生成
+                int size = CodeGenerator.StackAlign(self.Type.SizeOf());
+                _localScopeTotalSize += size;
+                var ident = $"<temp:{_localScope.Count()}>";
+                var tp = Tuple.Create((string)null, -_localScopeTotalSize);
+                _localScope.Add(ident, tp);
+                _context.Emit($"# temp  : name={ident} address={-_localScopeTotalSize}(%ebp) type={self.Type.ToString()}");
+
+
+                // テンポラリ変数に初期化式の内容を適用
+                var va = new Value { Kind = Value.ValueKind.Var, Type = self.Type, Label = tp.Item1, Offset = tp.Item2 };
+                foreach (var commands in self.InitializeCommands) {
+                    var r = PathResolver.ResolvePath(commands.path);
+                    var v = new Value(va) { Type = r.Item1 };
+                    v.Offset += r.Item2;
+                    commands.expr.Accept(this, v);
+                    _context.Push(v);
+                    _context.Assign(r.Item1);
+                    _context.Discard();
+                }
+
+                // 戻り値はテンポラリ変数への参照
+                _context.Push(new Value { Kind = Value.ValueKind.Var, Type = self.Type, Label = tp.Item1, Offset = tp.Item2 });
+                return value;
+            }
+
+            public Value OnAlignofExpression(Expression.AlignofExpression self, Value value) {
+                _context.Push(new Value { Kind = Value.ValueKind.IntConst, Type = self.Type, IntConst = self.TypeOperand.AlignOf() });
+                return value;
+            }
         }
 
         protected class FileScopeInitializerVisitor : SyntaxTree.IVisitor<Value, Value> {
@@ -5505,32 +5828,16 @@ namespace AnsiCParser {
                 _context.Emit(s);
             }
 
-            /// <summary>
-            /// 初期化情報
-            /// </summary>
-            private struct ValueEntry {
-                public int ByteOffset { get; }
-                public int BitOffset { get; }
-                public int BitSize { get; }
-                public Expression Expr { get; }
-
-                public ValueEntry(int byteOffset, int bitOffset, int bitSize, Expression expr) {
-                    this.ByteOffset = byteOffset;
-                    this.BitOffset = bitOffset;
-                    this.BitSize = bitSize;
-                    this.Expr = expr;
-                }
-            }
 
             /// <summary>
             /// 初期化式を元に作成した初期化対象情報
             /// </summary>
-            private readonly List<ValueEntry> _initValues = new List<ValueEntry>();
+            private readonly List<InitializeCommandsResolver.ValueEntry> _initValues = new List<InitializeCommandsResolver.ValueEntry>();
 
-            /// <summary>
-            /// 初期化式の対象バイトオフセット
-            /// </summary>
-            private int _currentOffsetByte = 0;
+            ///// <summary>
+            ///// 初期化式の対象バイトオフセット
+            ///// </summary>
+            //private int _currentOffsetByte = 0;
 
             public FileScopeInitializerVisitor(CodeGenerator context) {
                 _context = context;
@@ -5548,77 +5855,105 @@ namespace AnsiCParser {
                 throw new NotImplementedException();
             }
 
+
             public Value OnVariableDeclaration(Declaration.VariableDeclaration self, Value value) {
                 // ファイルスコープ変数
                 if (self.Init != null) {
                     Emit(".section .data");
                     self.Init.Accept(this, value);
                     Emit(".align 4");
-                    if (self.LinkageObject.Linkage == LinkageKind.ExternalLinkage) {
+                    if (self.LinkageObject.Linkage == Kind.ExternalLinkage) {
                         _context.Emit($".globl {self.LinkageObject.LinkageId}");
                     }
                     Emit($"{self.LinkageObject.LinkageId}:");
-                    foreach (var val in _initValues) {
+
+                    var values = InitializeCommandsResolver.Padding(_initValues, self.Type);
+
+                    for (var i = 0; i < values.Count; i++) {
+                        var val = values[i];
                         var byteOffset = val.ByteOffset;
                         var bitOffset = val.BitOffset;
                         var bitSize = val.BitSize;
-                        var cvalue = val.Expr.Accept(this, value);
-                        switch (cvalue.Kind) {
-                            case Value.ValueKind.IntConst:
-                                switch (cvalue.Type.SizeOf()) {
-                                    case 1:
-                                        Emit($".byte {(byte)cvalue.IntConst}");
-                                        break;
-                                    case 2:
-                                        Emit($".word {(ushort)cvalue.IntConst}");
-                                        break;
-                                    case 4:
-                                        Emit($".long {(uint)cvalue.IntConst}");
-                                        break;
-                                    case 8:
-                                        Emit($".long {(UInt64)cvalue.IntConst & 0xFFFFFFFFUL}, {(UInt64)(cvalue.IntConst >> 32) & 0xFFFFFFFFUL}");
-                                        break;
-                                    default:
-                                        throw new ArgumentOutOfRangeException();
-                                }
 
-                                break;
-                            case Value.ValueKind.FloatConst:
-                                switch (cvalue.Type.SizeOf()) {
-                                    case 4: {
-                                            var dwords = BitConverter.ToUInt32(BitConverter.GetBytes((float)cvalue.FloatConst), 0);
-                                            Emit($".long {dwords}");
+                        if (bitOffset != -1) {
+                            var buffer = new BitBuffer();
+                            while (i < values.Count) {
+                                val = values[i];
+                                if (val.BitOffset == -1) {
+                                    break;
+                                }
+                                var cvalue = val.Expr.Accept(this, value);
+                                if (cvalue.Kind != Value.ValueKind.IntConst) {
+                                    throw new Exception("ビットフィールドの型が整数型以外");
+                                }
+                                buffer.Write((ulong)cvalue.IntConst, val.ByteOffset*8+val.BitOffset, val.BitSize);
+
+                                i++;
+
+                            }
+                            i--;
+                            Emit($".byte {String.Join(", ", buffer.Select(x => x.ToString()))}");
+                            continue;
+                        } else {
+
+                            var cvalue = val.Expr.Accept(this, value);
+                            switch (cvalue.Kind) {
+                                case Value.ValueKind.IntConst:
+                                    switch (cvalue.Type.SizeOf()) {
+                                        case 1:
+                                            Emit($".byte {(byte)cvalue.IntConst}");
                                             break;
-                                        }
-                                    case 8: {
-                                            var lo = BitConverter.ToUInt32(BitConverter.GetBytes((double)cvalue.FloatConst), 0);
-                                            var hi = BitConverter.ToUInt32(BitConverter.GetBytes((double)cvalue.FloatConst), 4);
-
-                                            Emit($".long {lo}, {hi}");
+                                        case 2:
+                                            Emit($".word {(ushort)cvalue.IntConst}");
                                             break;
-                                        }
-                                    default:
-                                        throw new ArgumentOutOfRangeException();
-                                }
+                                        case 4:
+                                            Emit($".long {(uint)cvalue.IntConst}");
+                                            break;
+                                        case 8:
+                                            Emit($".long {(UInt64)cvalue.IntConst & 0xFFFFFFFFUL}, {(UInt64)(cvalue.IntConst >> 32) & 0xFFFFFFFFUL}");
+                                            break;
+                                        default:
+                                            throw new ArgumentOutOfRangeException();
+                                    }
 
-                                break;
-                            case Value.ValueKind.Var:
-                            case Value.ValueKind.Ref:
-                                if (cvalue.Label == null) {
-                                    throw new Exception("ファイルスコープオブジェクトの参照では無い。");
-                                }
+                                    break;
+                                case Value.ValueKind.FloatConst:
+                                    switch (cvalue.Type.SizeOf()) {
+                                        case 4: {
+                                                var dwords = BitConverter.ToUInt32(BitConverter.GetBytes((float)cvalue.FloatConst), 0);
+                                                Emit($".long {dwords}");
+                                                break;
+                                            }
+                                        case 8: {
+                                                var lo = BitConverter.ToUInt32(BitConverter.GetBytes((double)cvalue.FloatConst), 0);
+                                                var hi = BitConverter.ToUInt32(BitConverter.GetBytes((double)cvalue.FloatConst), 4);
 
-                                Emit($".long {cvalue.Label}+{cvalue.Offset}");
-                                break;
-                            default:
-                                throw new ArgumentOutOfRangeException();
+                                                Emit($".long {lo}, {hi}");
+                                                break;
+                                            }
+                                        default:
+                                            throw new ArgumentOutOfRangeException();
+                                    }
+
+                                    break;
+                                case Value.ValueKind.Var:
+                                case Value.ValueKind.Ref:
+                                    if (cvalue.Label == null) {
+                                        throw new Exception("ファイルスコープオブジェクトの参照では無い。");
+                                    }
+
+                                    Emit($".long {cvalue.Label}+{cvalue.Offset}");
+                                    break;
+                                default:
+                                    throw new ArgumentOutOfRangeException();
+                            }
                         }
                     }
                 } else {
-                    if (self.LinkageObject.Linkage == LinkageKind.ExternalLinkage) {
-                        Emit($".comm {self.LinkageObject.LinkageId}, {self.LinkageObject.Type.SizeOf()}, 4");
+                    if (self.LinkageObject.Linkage == Kind.ExternalLinkage) {
+                        Emit($".comm {self.LinkageObject.LinkageId}, {self.LinkageObject.Type.SizeOf()}");
                     } else {
-                        Emit($".lcomm {self.LinkageObject.LinkageId}, {self.LinkageObject.Type.SizeOf()}, 4");
+                        Emit($".lcomm {self.LinkageObject.LinkageId}, {self.LinkageObject.Type.SizeOf()}");
                     }
                 }
 
@@ -5749,9 +6084,9 @@ namespace AnsiCParser {
                 return new Value { Kind = Value.ValueKind.IntConst, IntConst = self.Value, Type = self.Type };
             }
 
-            public Value OnEnclosedInParenthesesExpression(Expression.PrimaryExpression.EnclosedInParenthesesExpression self, Value value) {
-                throw new NotImplementedException();
-            }
+            //public Value OnEnclosedInParenthesesExpression(Expression.PrimaryExpression.EnclosedInParenthesesExpression self, Value value) {
+            //    throw new NotImplementedException();
+            //}
 
             public Value OnAddressConstantExpression(Expression.PrimaryExpression.AddressConstantExpression self, Value value) {
                 if (self.Identifier is Expression.PrimaryExpression.IdentifierExpression.FunctionExpression) {
@@ -5866,16 +6201,17 @@ namespace AnsiCParser {
             public Value OnSimpleInitializer(Initializer.SimpleInitializer self, Value value) {
                 throw new NotImplementedException();
             }
-            public Value OnConcreteInitializer(Initializer.ConcreteInitializer self, Value value) {
-                foreach (var commands in self.InitializeCommands) {
+            private void Expand(InitializeCommand[] initializeCommands, int offset) {
+                foreach (var commands in initializeCommands) {
                     var r = PathResolver.ResolvePath(commands.path);
-                    var ret = ExpressionEvaluator.Eval(commands.expr);
-                    var ty = r.Item1;
-                    var offsetByte = r.Item2;
-                    var offsetBit = ty.IsBitField() ? ((DataType.BitFieldType)ty).BitOffset : -1;
-                    var bitWidth  = ty.IsBitField() ? ((DataType.BitFieldType)ty).BitWidth : -1;
-                    _initValues.Add(new ValueEntry(offsetByte, offsetBit, bitWidth, ret));
+
                 }
+            }
+
+
+
+            public Value OnConcreteInitializer(Initializer.ConcreteInitializer self, Value value) {
+                InitializeCommandsResolver.Resolve(self.InitializeCommands, 0, _initValues);
                 return value;
             }
 
@@ -6121,6 +6457,19 @@ namespace AnsiCParser {
                 throw new NotImplementedException();
             }
 
+            public Value OnCompoundLiteralExpression(Expression.PrimaryExpression.CompoundLiteralExpression self, Value value) {
+#warning "要確認"
+                InitializeCommandsResolver.Resolve(self.InitializeCommands, 0, _initValues);
+                var ret = InitializeCommandsResolver.Padding(_initValues,self.Type);
+                _initValues.Clear();
+                _initValues.AddRange(ret);
+                return value;
+            }
+
+            public Value OnAlignofExpression(Expression.AlignofExpression self, Value value) {
+                    _context.Push(new Value { Kind = Value.ValueKind.IntConst, Type = self.Type, IntConst = self.TypeOperand.AlignOf() });
+                    return value;
+            }
         }
 
         public void Compile(Ast ret, StreamWriter o) {
@@ -6143,11 +6492,19 @@ namespace AnsiCParser {
             }
             TaggedType.StructUnionType suType;
             if (path.ParentType.IsStructureType(out suType)) {
-                offsetByte += suType.Members[path.Index].Offset;
-                return Tuple.Create(suType.Members[path.Index].Type, offsetByte);
+                if (path.Index == -1) {
+                    return Tuple.Create(path.ParentType, offsetByte);
+                } else {
+                    offsetByte += suType.Members[path.Index].Offset;
+                    return Tuple.Create(suType.Members[path.Index].Type, offsetByte);
+                }
             }
             if (path.ParentType.IsUnionType(out suType)) {
-                return Tuple.Create(suType.Members[path.Index].Type, offsetByte);
+                if (path.Index == -1) {
+                    return Tuple.Create(path.ParentType, offsetByte);
+                } else {
+                    return Tuple.Create(suType.Members[path.Index].Type, offsetByte);
+                }
             }
             return Tuple.Create(path.ParentType, offsetByte);
         }

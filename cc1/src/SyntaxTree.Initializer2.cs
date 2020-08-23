@@ -118,12 +118,26 @@ namespace AnsiCParser.SyntaxTree {
         // SimpleInitializerはそのまま使う。初期化子並びと指示初期化子はバラす。
 
         /// <summary>
-        /// 中間語生成して具体化した初期子
+        /// 具体的な初期子
         /// </summary>
         public class ConcreteInitializer : Initializer {
+            /// <summary>
+            /// 初期化式の型
+            /// </summary>
+            public CType Type { get; }
+
+            /// <summary>
+            /// この初期化子の生成本になった初期化子
+            /// </summary>
             public Initializer OriginalInitializer { get; }
-            public Result[] InitializeCommands { get; }
-            public ConcreteInitializer(LocationRange locationRange, Initializer originalInitializer, Result[] initializeCommands) : base(locationRange) {
+
+            /// <summary>
+            /// 初期化子から生成された初期化コマンド列
+            /// </summary>
+            public InitializeCommand[] InitializeCommands { get; }
+
+            public ConcreteInitializer(LocationRange locationRange, CType type, Initializer originalInitializer, InitializeCommand[] initializeCommands) : base(locationRange) {
+                Type = type;
                 OriginalInitializer = originalInitializer;
                 InitializeCommands = initializeCommands;
             }
@@ -184,6 +198,9 @@ namespace AnsiCParser.SyntaxTree {
         /// 指示に相当する要素
         /// </summary>
         public class DesignatorInitializer : Initializer {
+            /// <summary>
+            /// 指示子列
+            /// </summary>
             public List<Designator> Path { get; }
             public DesignatorInitializer(LocationRange locationRange, List<Designator> path) : base(locationRange) {
                 Path = path;
@@ -199,10 +216,18 @@ namespace AnsiCParser.SyntaxTree {
     }
 
 
+    /// <summary>
+    /// 初期化式に対する順方向イテレータ
+    /// </summary>
     public class InitializerIterator {
         private List<Initializer> _expr { get; }
         private int _index { get; set; }
 
+        /// <summary>
+        /// 初期化式をフラットな式の形に変形する
+        /// </summary>
+        /// <param name="ret"></param>
+        /// <param name="expr"></param>
         private void flatten(List<Initializer> ret, Initializer expr) {
             if (expr is Initializer.ComplexInitializer) {
                 ret.Add(new Initializer.EnterInitializer(expr.LocationRange));
@@ -219,12 +244,20 @@ namespace AnsiCParser.SyntaxTree {
                 throw new CompilerException.InternalErrorException(expr.LocationRange, "初期化式の解析に不正な型が渡されました。おそらく処理系の誤りです。");
             }
         }
+
+        /// <summary>
+        /// コンストラクタ
+        /// </summary>
+        /// <param name="expr"></param>
         public InitializerIterator(Initializer expr) {
             this._expr = new List<Initializer>();
             this._index = 0;
             this.flatten(this._expr, expr);
         }
 
+        /// <summary>
+        /// イテレータが差し示す初期化式を得る
+        /// </summary>
         public Initializer current {
             get {
                 if (0 <= this._index && this._index < this._expr.Count) {
@@ -234,6 +267,11 @@ namespace AnsiCParser.SyntaxTree {
                 }
             }
         }
+
+        /// <summary>
+        /// 次の初期化式に移動する
+        /// </summary>
+        /// <returns></returns>
         public bool next() {
             if (0 <= this._index && this._index < this._expr.Count) {
                 this._index += 1;
@@ -243,9 +281,9 @@ namespace AnsiCParser.SyntaxTree {
             }
         }
 
-        public bool isNotLeave() {
-            return !(this.current is Initializer.LeaveInitializer);
-        }
+        /// <summary>
+        /// 現在地を含めて現在地から最も近いInitializer.LeaveInitializerまで読み飛ばす。
+        /// </summary>
         public void leave() {
             for (var p = this.current; (p = this.current) != null; this.next()) {
                 if (p is Initializer.LeaveInitializer) {
@@ -255,33 +293,51 @@ namespace AnsiCParser.SyntaxTree {
             }
         }
 
-        public List<Initializer> skip_to_leave() {
+        /// <summary>
+        /// 初期化子並びの最初の初期化子で初期化子並びを置き換える。（スカラ型に対して初期化子並びが使われている場合に使う）
+        /// </summary>
+        /// <returns>置き換えによって外された初期化子のリスト</returns>
+        public List<Initializer> truncate_to_simple() {
             if (!(this.current is Initializer.EnterInitializer)) {
                 throw new CompilerException.InternalErrorException(this.current.LocationRange, "初期化式の解析中に想定外の型が出現しました。おそらく処理系の誤りです。");
             }
+
+            var initializers = new List<Initializer>();
+
+            // 初期化子並びの入れ子を考慮しながら初期化子を列挙
             var nest = 0;
-            var discardExpr = new List<Initializer>();
-            for (var i = this._index + 1; this._expr.Count > i; i++) {
-                if (this._expr[i] is Initializer.EnterInitializer) {
+            for (var i = this._index;  i < this._expr.Count; i++) {
+                var initializer = this._expr[i];
+                if (initializer is Initializer.EnterInitializer) {
+                    // 入れ子になっている初期化子並びが開始しているので中に入る
                     nest++;
-                } else if (this._expr[i] is Initializer.LeaveInitializer) {
+                } else if (initializer is Initializer.LeaveInitializer) {
+                    // 初期化子並びが終わっている
                     if (nest == 0) {
-                        this._expr.RemoveRange(this._index + 1, i - (this._index + 1));
-                        this._expr.Insert(this._index + 1, discardExpr[0]);
-                        discardExpr.RemoveAt(0);
-                        return discardExpr;
+                        // 入れ子の対応が取れていないため、エラーを出力する
+                        throw new CompilerException.SyntaxErrorException(this.current.LocationRange, "空の初期化式が存在します。");
                     } else {
                         nest--;
+                        if (nest == 0) {
+                            // 最初の初期化子並びの終端に出会ったので列挙終了
+                            this._expr.RemoveRange(this._index, i - this._index + 1);
+                            this._expr.Insert(this._index, initializers.First());
+                            initializers.RemoveAt(0);
+                            return initializers;
+                        }
                     }
                 } else {
-                    discardExpr.Add(this._expr[i]);
+                    // 初期化子が見つかった。
+                    initializers.Add(initializer);
                 }
             }
             throw new CompilerException.InternalErrorException(this.current.LocationRange, "初期化式の解析中でEnterとLeaveの数が一致しません。おそらく処理系の誤りです。");
         }
-
     }
 
+    /// <summary>
+    /// 型に対する順方向イテレータ
+    /// </summary>
     public class TyNav {
         public class Context {
             public List<Tuple<CType, int, int>> _stack;
@@ -302,6 +358,10 @@ namespace AnsiCParser.SyntaxTree {
             this._index = -1;
             this._fakepush = 0;
         }
+
+        /// <summary>
+        /// メンバ式を構成する節
+        /// </summary>
         public class PathPart {
             public CType ParentType { get; }
             public int Index { get; }
@@ -311,11 +371,12 @@ namespace AnsiCParser.SyntaxTree {
                 ParentType = parentType;
                 Index = index;
             }
-
         }
+
         public PathPart[] getPath() {
             return this._stack.Skip(1).Select((x) => new PathPart(x.Item1, x.Item2)).Concat(new[] { new PathPart(this._current, this._index) }).ToArray();
         }
+
         public Context getStack() {
             return new Context() {
                 _stack = this._stack.ToList(),
@@ -421,17 +482,21 @@ namespace AnsiCParser.SyntaxTree {
                     if (suType.Members.Count <= this._index) {
                         return false;
                     }
-                    if (suType.Members[this._index].Ident == null) {
-                        this._index++;
-                        continue;
+                    if (this._index + 1 < suType.Members.Count && suType.Members[this._index+1].Ident == null) {
+                        if (suType.Members[this._index + 1].Type.IsBitField()) {
+                            this._index++;
+                            continue;
+                        } else {
+                            Logger.Warning(Location.Empty, "匿名構造体/共用体を初期化しています。");
+                        }
                     }
                     this._index++;
                     return true;
 
                 }
-            } else if (parent.IsUnionType()) {
+            } else if (parent.IsUnionType(out suType)) {
                 if (this._index == 0) {
-                    this._index++;
+                    this._index = suType.Members.Count;
                     return true;
                 } else {
                     return false;
@@ -466,58 +531,101 @@ namespace AnsiCParser.SyntaxTree {
         }
         public void enterArray() {
             if (this.isArrayType() == false) { throw new CompilerException.InternalErrorException(LocationRange.Empty, "current is not array type"); }
-            var cur = this.current as ArrayType;
+            var cur = this.current.Unwrap() as ArrayType;
             this._stack.Add(Tuple.Create(this._current, this._index, this._fakepush));
             this._current = cur;
             this._index = 0;
             this._fakepush = 0;
         }
 
+        /// <summary>
+        /// カーソルを今指示している配列型の指定した添え字のメンバに移動する
+        /// </summary>
+        /// <param name="index"></param>
         public void selectIndex(int index) {
             CType et;
             int len;
 
-            if (this.parent?.IsArrayType(out et, out len) != true) { throw new CompilerException.InternalErrorException(LocationRange.Empty, "parent is not array type"); }
+            if (this.parent != null && this.parent.IsArrayType(out et, out len) == true) {
+                if (len == -1) {
+                    // 不完全配列型の場合
+                    if (getPath().Length > 1) {
+                        // 不完全配列型が許されるのは、もっとも外側の構造体のメンバのみ
+                        throw new Exception("variable array legvel"); 
+                    }
+                } else {
+                    if (len <= index) { throw new Exception("outof index"); }
+                }
+            } else {
+                throw new CompilerException.InternalErrorException(LocationRange.Empty, "parent is not array type");
+            }
 
             this._index = index;
         }
 
+        /// <summary>
+        /// 現在カーソルが指し示す要素は共用体か？
+        /// </summary>
+        /// <returns></returns>
         public bool isUnionType() {
             return this.current?.IsUnionType() == true;
         }
+
+        /// <summary>
+        /// 現在カーソルは共用体中にあるか？
+        /// </summary>
+        /// <returns></returns>
         public bool isInUnionType() {
             return this.parent?.IsUnionType() == true;
         }
 
+        /// <summary>
+        /// カーソルを今指示している共用体型の最初のメンバに移動する
+        /// </summary>
         public void enterUnion() {
             if (this.isUnionType() == false) { throw new CompilerException.InternalErrorException(LocationRange.Empty, "current is not union type"); }
-            var cur = this.current as TaggedType.StructUnionType;
+            var cur = this.current.Unwrap() as TaggedType.StructUnionType;
             this._stack.Add(Tuple.Create(this._current, this._index, this._fakepush));
             this._current = cur;
             this._index = 0;
             this._fakepush = 0;
         }
 
+        /// <summary>
+        /// 現在カーソルが指し示す要素は構造体か？
+        /// </summary>
+        /// <returns></returns>
         public bool isStructType() {
             return this.current?.IsStructureType() == true;
         }
+
+        /// <summary>
+        /// 現在カーソルは構造体中にあるか？
+        /// </summary>
+        /// <returns></returns>
         public bool isInStructType() {
             return this.parent?.IsStructureType() == true;
         }
 
+        /// <summary>
+        /// カーソルを今指示している構造体型の最初のメンバに移動する
+        /// </summary>
         public void enterStruct() {
             if (this.isStructType() == false) { throw new CompilerException.InternalErrorException(LocationRange.Empty, "current is not struct type"); }
-            var cur = this.current as TaggedType.StructUnionType;
+            var cur = this.current.Unwrap() as TaggedType.StructUnionType;
             this._stack.Add(Tuple.Create(this._current, this._index, this._fakepush));
             this._current = cur;
             this._index = 0;
             this._fakepush = 0;
         }
+
+        /// <summary>
+        /// カーソルを今いる構造体/共用体中の指定した名前と一致する兄弟メンバに移動する。
+        /// </summary>
+        /// <param name="member"></param>
         public void selectMember(string member) {
             TaggedType.StructUnionType suType;
-            if (parent.IsStructureType(out suType)) {
-                this._index = suType.Members.FindIndex(x => x.Ident.Raw == member);
-            } else if (parent.IsUnionType(out suType)) {
+            if (parent.IsStructureType(out suType) || parent.IsUnionType(out suType)) {
                 this._index = suType.Members.FindIndex(x => x.Ident.Raw == member);
             } else {
                 throw new CompilerException.InternalErrorException(LocationRange.Empty, "parent is not struct/union type");
@@ -541,7 +649,7 @@ namespace AnsiCParser.SyntaxTree {
     }
 
 
-    public class Result {
+    public class InitializeCommand {
         public TyNav.PathPart[] path { get; set; }
         public Expression expr { get; set; }
         public override string ToString() {
@@ -562,7 +670,7 @@ namespace AnsiCParser.SyntaxTree {
             } else if (p.IsArrayType()) {
                 return new Initializer.Designator.IndexDesignator(
                     new Expression.PrimaryExpression.Constant.IntegerConstant(LocationRange.Empty, i.ToString(), i, BasicType.TypeKind.SignedInt),
-                    1
+                    i
                 );
             } else {
                 throw new CompilerException.InternalErrorException(LocationRange.Empty, "bad type");
@@ -574,13 +682,21 @@ namespace AnsiCParser.SyntaxTree {
             return String.Concat(path.Select(path_to_designator).Select(x => x.ToString()));
         }
 
-        public static Result[] do_parse(TyNav ty, InitializerIterator expr, bool isLocalVariableInit) {
-            List<Result> ret = new List<Result>();
+        public static InitializeCommand[] do_parse(TyNav ty, InitializerIterator expr, bool isLocalVariableInit) {
+            List<InitializeCommand> ret = new List<InitializeCommand>();
             List<TyNav.Context> stack = new List<TyNav.Context>() { ty.getStack() };
+            Stack<bool> exprEnter = new Stack<bool>();
+
             while (expr.current != null) {
                 var currentExpr = expr.current;
                 if (currentExpr == null) {
                     throw new Exception("current expr is null");
+                }
+                if (exprEnter.Any() && exprEnter.Peek() == false && ty.current == null) {
+                    exprEnter.Pop();
+                    ty.leave();
+                    ty.next();
+                    continue;
                 }
                 if (currentExpr is Initializer.DesignatorInitializer) {
                     var ce = currentExpr as Initializer.DesignatorInitializer;
@@ -628,6 +744,10 @@ namespace AnsiCParser.SyntaxTree {
                     expr.next();
                     continue;
                 } else if (currentExpr is Initializer.LeaveInitializer) {
+                    while (exprEnter.Any() && exprEnter.Peek() == false) {
+                        ty.leave();
+                        exprEnter.Pop();
+                    }
                     if (ty.isInStructType()) {
                         ty.leave();
                         ty.next();
@@ -645,11 +765,12 @@ namespace AnsiCParser.SyntaxTree {
                     expr.leave();
                     stack.RemoveAt(stack.Count - 1);
                     continue;
-                } else if (ty.current == null) {
+                } else if (ty.current == null && exprEnter.Peek() == false) {
                     while (ty.current == null) {
-                        if (ty.parent != null) {
+                        if (ty.parent != null && exprEnter.Peek() == false) {
                             ty.leave();
                             ty.next();
+                            exprEnter.Pop();
                         } else {
                             break;
                         }
@@ -660,62 +781,107 @@ namespace AnsiCParser.SyntaxTree {
                     continue;
                 } else if (currentExpr is Initializer.EnterInitializer) {
                     if (ty.isStructType()) {
+                        exprEnter.Push(true);
                         ty.enterStruct();
+                        stack.Add(ty.getStack());
+                        expr.next();
                     } else if (ty.isUnionType()) {
+                        exprEnter.Push(true);
                         ty.enterUnion();
+                        stack.Add(ty.getStack());
+                        expr.next();
                     } else if (ty.isArrayType()) {
+                        exprEnter.Push(true);
                         ty.enterArray();
+                        stack.Add(ty.getStack());
+                        expr.next();
                     } else {
                         Logger.Warning(currentExpr.LocationRange, "too many braces around scalar initializer");
-                        ty.enterFake();
-                        var skips = expr.skip_to_leave();
+                        //ty.enterFake();
+                        var skips = expr.truncate_to_simple();
                         foreach (var skip in skips) {
                             Logger.Warning(currentExpr.LocationRange, $"skip {skip.LocationRange}");
                         }
                     }
-                    stack.Add(ty.getStack());
-                    expr.next();
                     continue;
                 } else {
                     if (ty.isStructType()) {
-                        if (currentExpr is Initializer.SimpleInitializer && CType.IsEqual((currentExpr as Initializer.SimpleInitializer).AssignmentExpression.Type, ty.current)) {
-                            if (isLocalVariableInit == false) {
+                        if (currentExpr is Initializer.SimpleInitializer && CType.IsEqual((currentExpr as Initializer.SimpleInitializer).AssignmentExpression.Type.Unwrap(), ty.current.Unwrap())) {
+                            if (isLocalVariableInit == false && !((currentExpr as Initializer.SimpleInitializer).AssignmentExpression is Expression.PrimaryExpression.CompoundLiteralExpression)) {
                                 throw new CompilerException.SpecificationErrorException(currentExpr.LocationRange, "集成体型又は共用体型をもつオブジェクトに対する初期化子は，要素又は名前付きメンバに対する初期化子並びを波括弧で囲んだものでなければならない。");
                             }
-                            var r = new Result() { path = ty.getPath(), expr = (currentExpr as Initializer.SimpleInitializer).AssignmentExpression };
+                            var r = new InitializeCommand() { path = ty.getPath(), expr = (currentExpr as Initializer.SimpleInitializer).AssignmentExpression };
                             ret.Add(r);
                             ty.next();
                             expr.next();
                         } else {
                             ty.enterStruct();
+                            exprEnter.Push(false);
                         }
                         continue;
                     } else if (ty.isUnionType()) {
-                        if (currentExpr is Initializer.SimpleInitializer && CType.IsEqual((currentExpr as Initializer.SimpleInitializer).AssignmentExpression.Type, ty.current)) {
+                        if (currentExpr is Initializer.SimpleInitializer && CType.IsEqual((currentExpr as Initializer.SimpleInitializer).AssignmentExpression.Type.Unwrap(), ty.current.Unwrap())) {
                             if (isLocalVariableInit == false) {
                                 throw new CompilerException.SpecificationErrorException(currentExpr.LocationRange, "集成体型又は共用体型をもつオブジェクトに対する初期化子は，要素又は名前付きメンバに対する初期化子並びを波括弧で囲んだものでなければならない。");
                             }
-                            ret.Add(new Result() { path = ty.getPath(), expr = (currentExpr as Initializer.SimpleInitializer).AssignmentExpression });
+                            ret.Add(new InitializeCommand() { path = ty.getPath(), expr = (currentExpr as Initializer.SimpleInitializer).AssignmentExpression });
                             ty.next();
                             expr.next();
                         } else {
-
                             ty.enterUnion();
+                            exprEnter.Push(false);
                         }
                         continue;
                     } else if (ty.isArrayType()) {
-                        if (currentExpr is Initializer.SimpleInitializer && CType.IsEqual((currentExpr as Initializer.SimpleInitializer).AssignmentExpression.Type, ty.current)) {
-                            throw new Exception();
+                        var tyArray = ty.current.Unwrap() as ArrayType;
+                        if (currentExpr is Initializer.SimpleInitializer) {
+                            if ((currentExpr as Initializer.SimpleInitializer).AssignmentExpression is Expression.PrimaryExpression.StringExpression) {
+                                var sexpr = (currentExpr as Initializer.SimpleInitializer).AssignmentExpression as Expression.PrimaryExpression.StringExpression;
+                                if (tyArray.ElementType.IsCharacterType() == false) {
+                                    throw new CompilerException.SpecificationErrorException(currentExpr.LocationRange, $"char型の文字列リテラルで{tyArray.ElementType.ToString()}型の配列は初期化できません。");
+                                }
+                                if (tyArray.Length == -1) {
+                                    tyArray.Length = sexpr.Value.Count;
+                                } else {
+                                    var len = Math.Min(tyArray.Length, sexpr.Value.Count);
+                                    if (tyArray.Length + 1 == sexpr.Value.Count) {
+                                        Logger.Warning(currentExpr.LocationRange, "末尾のヌル文字は切り捨てられます。これが意図した動作でない場合は修正を行ってください。");
+                                    } else if (tyArray.Length < sexpr.Value.Count) {
+                                        Logger.Warning(currentExpr.LocationRange, "char配列の初期化文字列が長すぎます。");
+                                    }
+                                    ty.enterArray();
+                                    for (var i = 0; i < len; i++) {
+                                        byte ch = sexpr.Value[i];
+                                        var chExpr = new Expression.PrimaryExpression.Constant.IntegerConstant(currentExpr.LocationRange, "", ch, BasicType.TypeKind.Char);
+                                        var assign = Expression.AssignmentExpression.SimpleAssignmentExpression.ApplyAssignmentRule(currentExpr.LocationRange, tyArray.ElementType, chExpr);
+                                        ret.Add(new InitializeCommand() { path = ty.getPath(), expr = chExpr });
+                                        ty.next();
+                                    }
+                                    ty.leave();
+                                    ty.next();
+                                    expr.next();
+                                }
+
+                            } else {
+                                ty.enterArray();
+                                exprEnter.Push(false);
+                                //throw new CompilerException.SpecificationErrorException(currentExpr.LocationRange, "配列初期化子は初期化子リストまたは文字列リテラルである必要があります");
+                            }
                         } else {
                             ty.enterArray();
+                            exprEnter.Push(false);
                         }
                         continue;
-                        //} else if (currentExpr is Initializer.SimpleInitializer && CType.IsEqual((currentExpr as Initializer.SimpleInitializer).AssignmentExpression.Type, ty.current)) {
                     } else if (currentExpr is Initializer.SimpleInitializer) {
-                        var assign = Expression.AssignmentExpression.SimpleAssignmentExpression.ApplyAssignmentRule(currentExpr.LocationRange, ty.current, (currentExpr as Initializer.SimpleInitializer).AssignmentExpression);
+                        if (ty.current != null) {
 
-                        ret.Add(new Result() { path = ty.getPath(), expr = assign });
-                        ty.next();
+                            var assign = Expression.AssignmentExpression.SimpleAssignmentExpression.ApplyAssignmentRule(currentExpr.LocationRange, ty.current, (currentExpr as Initializer.SimpleInitializer).AssignmentExpression);
+
+                            ret.Add(new InitializeCommand() { path = ty.getPath(), expr = assign });
+                            ty.next();
+                        } else {
+                            Logger.Warning(currentExpr.LocationRange, "初期化対象が存在しない初期化子です。無視されます。");
+                        }
                         expr.next();
                         continue;
                     } else {
@@ -727,8 +893,8 @@ namespace AnsiCParser.SyntaxTree {
             return ret.ToArray();
         }
 
-        private static Result[] compaction(Result[] inputs) {
-            var outputs = new List<Result>();
+        private static InitializeCommand[] compaction(InitializeCommand[] inputs) {
+            var outputs = new List<InitializeCommand>();
 
             foreach (var input in inputs) {
                 for (var j = 0; j < outputs.Count; j++) {
@@ -763,7 +929,7 @@ namespace AnsiCParser.SyntaxTree {
             return outputs.ToArray();
         }
 
-        private static Result[] sorting(Result[] inputs) {
+        private static InitializeCommand[] sorting(InitializeCommand[] inputs) {
             var inp = inputs.ToList();
             inp.Sort((x, y) => {
                 var last = (x.path.Length < y.path.Length) ? -1 : (x.path.Length > y.path.Length ? 1 : 0);
@@ -777,7 +943,7 @@ namespace AnsiCParser.SyntaxTree {
             return inp.ToArray();
         }
 
-        public static Result[] parsing(CType ty, Initializer expr, bool isLocalVariableInit) {
+        public static InitializeCommand[] parsing(CType ty, Initializer expr, bool isLocalVariableInit) {
             if (expr != null) {
                 var tyNav = new TyNav(ty);
                 var exprIt = new InitializerIterator(expr);
@@ -795,7 +961,7 @@ namespace AnsiCParser.SyntaxTree {
                 }
                 return ret;
             } else {
-                return new Result[0];
+                return new InitializeCommand[0];
             }
         }
     }

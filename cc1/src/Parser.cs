@@ -1,9 +1,9 @@
 using System;
-using System.CodeDom;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using AnsiCParser.DataType;
+using AnsiCParser.Linkage;
 using AnsiCParser.SyntaxTree;
 
 namespace AnsiCParser {
@@ -31,7 +31,7 @@ namespace AnsiCParser {
         /// <summary>
         /// リンケージオブジェクト表
         /// </summary>
-        private LinkageObjectTable _linkageObjectTable { get; } = new LinkageObjectTable();
+        private Table _linkageObjectTable { get; } = new Table();
 
         /// <summary>
         /// break命令についてのスコープ
@@ -131,7 +131,7 @@ namespace AnsiCParser {
         /// <param name="scope"></param>
         /// <param name="identScope"></param>
         /// <returns></returns>
-        private static LinkageKind ResolveLinkage(Token ident, CType type, StorageClassSpecifier storageClass, ScopeKind scope, Scope<Declaration> identScope) {
+        private static Kind ResolveLinkage(Token ident, CType type, StorageClassSpecifier storageClass, ScopeKind scope, Scope<Declaration> identScope) {
             return ResolveLinkage(ident, type, storageClass, scope, identScope, false);
         }
 
@@ -145,7 +145,7 @@ namespace AnsiCParser {
         /// <param name="identScope"></param>
         /// <param name="hasInitializer"></param>
         /// <returns></returns>
-        private static LinkageKind ResolveLinkage(Token ident, CType type, StorageClassSpecifier storageClass, ScopeKind scope, Scope<Declaration> identScope, bool hasInitializer) {
+        private static Kind ResolveLinkage(Token ident, CType type, StorageClassSpecifier storageClass, ScopeKind scope, Scope<Declaration> identScope, bool hasInitializer) {
             if (identScope == null) {
                 throw new ArgumentNullException(nameof(identScope));
             }
@@ -161,13 +161,13 @@ namespace AnsiCParser {
                         // 6.2.2 識別子の結合
                         // オブジェクト又は関数以外を宣言する識別子，関数仮引数を宣言する識別子，及び記憶域クラス指定子 extern を伴わないブロック有効範囲のオブジェクトを宣言する識別子は，無結合とする。
                         // auto/register 指定はどちらも 記憶域クラス指定子 extern を伴わないブロック有効範囲のオブジェクトの宣言なので無結合
-                        return LinkageKind.NoLinkage;
+                        return Kind.NoLinkage;
                     }
                 case AnsiCParser.StorageClassSpecifier.Typedef:
                     // 6.2.2 識別子の結合
                     // オブジェクト又は関数以外を宣言する識別子，関数仮引数を宣言する識別子，及び記憶域クラス指定子 extern を伴わないブロック有効範囲のオブジェクトを宣言する識別子は，無結合とする。
                     // typedef は オブジェクト又は関数以外を宣言する識別子 なので無結合
-                    return LinkageKind.NoLinkage;
+                    return Kind.NoLinkage;
                 case AnsiCParser.StorageClassSpecifier.Static:
                     if (type.IsFunctionType()) {
                         if (scope == ScopeKind.BlockScope) {
@@ -179,10 +179,10 @@ namespace AnsiCParser {
                     if (scope == ScopeKind.FileScope && (type.IsObjectType() || type.IsFunctionType() || (type.IsArrayType() && hasInitializer))) {
                         // 6.2.2 識別子の結合
                         // オブジェクト又は関数に対するファイル有効範囲の識別子の宣言が記憶域クラス指定子 static を含む場合，その識別子は，内部結合をもつ
-                        return LinkageKind.InternalLinkage;
+                        return Kind.InternalLinkage;
                     } else if (scope == ScopeKind.BlockScope) {
                         // 記憶域クラス指定子 extern を伴わないブロック有効範囲のオブジェクトを宣言する識別子は，無結合とする
-                        return LinkageKind.NoLinkage;  // 無結合
+                        return Kind.NoLinkage;  // 無結合
                     } else {
                         throw new CompilerException.SpecificationErrorException(ident.Range, "オブジェクト又は関数に対するファイル有効範囲の識別子の宣言、もしくは、記憶域クラス指定子 extern を伴わないブロック有効範囲のオブジェクト、のどちらでもない識別子の宣言で static が使用されている。");
                     }
@@ -201,11 +201,11 @@ namespace AnsiCParser {
                     } else {
                         if (scope == ScopeKind.FileScope) {
                             //  -> オブジェクトの識別子の宣言がファイル有効範囲場合，その識別子の結合は，外部結合とする
-                            return LinkageKind.ExternalLinkage;// 外部結合
+                            return Kind.ExternalLinkage;// 外部結合
                         }
 
                         // 記憶域クラス指定子 extern を伴わないブロック有効範囲のオブジェクトを宣言する識別子は，無結合とする
-                        return LinkageKind.NoLinkage;// 無結合
+                        return Kind.NoLinkage;// 無結合
 
                     }
                 case AnsiCParser.StorageClassSpecifier.Extern: {
@@ -213,14 +213,14 @@ namespace AnsiCParser {
                         Declaration iv;
                         if (identScope.TryGetValue(ident.Raw, out iv)) {
                             switch (iv.LinkageObject.Linkage) {
-                                case LinkageKind.ExternalLinkage:
-                                case LinkageKind.InternalLinkage:
+                                case Kind.ExternalLinkage:
+                                case Kind.InternalLinkage:
                                     // - 以前の宣言において内部結合又は外部結合が指定されているならば，新しい宣言における識別子は，以前の宣言と同じ結合をもつ。
                                     return iv.LinkageObject.Linkage;
-                                case LinkageKind.NoLinkage:
+                                case Kind.NoLinkage:
                                     // - 可視である以前の宣言がない場合，又は以前の宣言が無結合である場合，この識別子は外部結合をもつ。
                                     // => 以前の宣言が無結合なのでこの識別子は外部結合をもつ。
-                                    return LinkageKind.ExternalLinkage;// 外部結合
+                                    return Kind.ExternalLinkage;// 外部結合
                                 default:
                                     throw new Exception("");
                             }
@@ -228,7 +228,7 @@ namespace AnsiCParser {
 
                         // - 可視である以前の宣言がない場合，又は以前の宣言が無結合である場合，この識別子は外部結合をもつ。
                         // => 可視である以前の宣言がないのでこの識別子は外部結合をもつ。
-                        return LinkageKind.ExternalLinkage;// 外部結合
+                        return Kind.ExternalLinkage;// 外部結合
                     }
                 default:
                     throw new Exception();
@@ -691,6 +691,8 @@ namespace AnsiCParser {
             // 6.9.2 外部オブジェクト定義
             // 翻訳単位が，ある識別子に対する仮定義を一つ以上含み，かつその識別子に対する外部定義を含まない場合，
             // その翻訳単位に，翻訳単位の終わりの時点での合成型，及び 0 に等しい初期化子をもったその識別子のファイル有効範囲の宣言がある場合と同じ規則で動作する。
+            // 
+            // 注意が必要な例：int i[]; の場合は int i[] = {0}; とみなされる。すなわち、要素数未定義の場合はちょうど1個の要素を持つとして解釈される。 
             foreach (var entry in _linkageObjectTable.LinkageObjects) {
                 if (entry.Definition == null) {
                     {
@@ -709,6 +711,9 @@ namespace AnsiCParser {
                             //entry.TentativeDefinitions.RemoveAt(0);
                             entry.Definition = definition;
                             entry.TentativeDefinitions.Remove(definition);
+                            if (definition.Type.IsNoLengthArrayType()) {
+                                (definition.Type.Unwrap() as ArrayType).Length = 1;
+                            }
                         }
                     }
                 }
@@ -1286,6 +1291,41 @@ namespace AnsiCParser {
             var tok = _lexer.ReadToken(Token.TokenKind.STRUCT, Token.TokenKind.UNION);
             var kind = tok.Kind == Token.TokenKind.STRUCT ? TaggedType.StructUnionType.StructOrUnion.Struct : TaggedType.StructUnionType.StructOrUnion.Union;
 
+            // デフォルトのパックサイズを取得
+            var packSize = Settings.PackSize;
+            var alignSize = Settings.AlignSize;
+            // gcc extention option
+            {
+                Token t;
+                if (_lexer.PeekToken(out t, Token.TokenKind.IDENTIFIER) && t.Raw == @"__attribute__") {
+                    _lexer.ReadToken(Token.TokenKind.IDENTIFIER);
+                    _lexer.ReadToken('(');
+                    _lexer.ReadToken('(');
+                    // packed
+                    for (; ;) {
+                        Token t2;
+                        if (_lexer.PeekToken(out t2, Token.TokenKind.IDENTIFIER) && t2.Raw == @"packed") {
+                            _lexer.ReadToken(Token.TokenKind.IDENTIFIER);
+                            packSize = 1;
+                        } else if (_lexer.PeekToken(out t2, Token.TokenKind.IDENTIFIER) && t2.Raw == @"aligned") {
+                            _lexer.ReadToken(Token.TokenKind.IDENTIFIER);
+                            _lexer.ReadToken('(');
+                            var constant = IntegerConstant();
+                            alignSize = (int)constant.Value;
+                            _lexer.ReadToken(')');
+                        }
+                        if (_lexer.ReadTokenIf(',')) {
+                            continue;
+                        }
+                        if (_lexer.ReadTokenIf(')')) {
+                            break;
+                        }
+                    }
+                _lexer.ReadToken(')');
+                }
+            }
+            // msvc style option
+
             // 識別子の有無で分岐
             if (IsIdentifier(true)) {
 
@@ -1303,7 +1343,7 @@ namespace AnsiCParser {
                         if (taggedType != null && isCurrent == false) {
                             Logger.Warning(token.Range, $"構造体/共用体 タグ名 {ident} の宣言は外側のスコープで宣言されている同じタグ名の宣言を隠します。");
                         }
-                        structUnionType = new TaggedType.StructUnionType(kind, ident, false);
+                        structUnionType = new TaggedType.StructUnionType(kind, ident, false, packSize, alignSize);
                         _tagScope.Add(ident, structUnionType);
                         AddImplicitTypeDeclaration(token, structUnionType);
                     } else if (!(taggedType is TaggedType.StructUnionType)) {
@@ -1326,7 +1366,7 @@ namespace AnsiCParser {
                     TaggedType taggedType;
                     if (_tagScope.TryGetValue(ident, out taggedType) == false) {
                         // タグ名前表に無い場合は新しく追加する。
-                        taggedType = new TaggedType.StructUnionType(kind, ident, false);
+                        taggedType = new TaggedType.StructUnionType(kind, ident, false, packSize, alignSize);
                         _tagScope.Add(ident, taggedType);
                         AddImplicitTypeDeclaration(token, taggedType);
                     } else if (!(taggedType is TaggedType.StructUnionType)) {
@@ -1344,7 +1384,7 @@ namespace AnsiCParser {
                 var ident = $"${kind}_{_anonymousNameCounter++}";
 
                 // 型情報を生成する
-                var structUnionType = new TaggedType.StructUnionType(kind, ident, true);
+                var structUnionType = new TaggedType.StructUnionType(kind, ident, true, packSize, alignSize);
 
                 // タグ名前表に追加する
                 _tagScope.Add(ident, structUnionType);
@@ -1551,8 +1591,10 @@ namespace AnsiCParser {
                 }
 
                 TaggedType.StructUnionType stType;
-                if ((type.IsStructureType(out stType) || type.IsUnionType(out stType)) && (stType.TagName == null)) {
-                    throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, "構造体/共用体のメンバ宣言子では、宣言子とビットフィールド部の両方を省略することはできません。無名構造体/共用体を使用できるのは規格上はC11からです。(C11 6.7.2.1で規定)。");
+                if ((type.IsStructureType(out stType) || type.IsUnionType(out stType)) && (stType.IsAnonymous == true)) {
+                    //throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, "構造体/共用体のメンバ宣言子では、宣言子とビットフィールド部の両方を省略することはできません。無名構造体/共用体を使用できるのは規格上はC11からです。(C11 6.7.2.1で規定)。");
+                    Logger.Warning(_lexer.CurrentToken().Range, "構造体/共用体のメンバ宣言子では、宣言子とビットフィールド部の両方を省略することはできません。無名構造体/共用体を使用できるのは規格上はC11からです。(C11 6.7.2.1で規定)。");
+                    return new TaggedType.StructUnionType.MemberInfo(null, type, 0);
                 } else {
                     Logger.Warning(_lexer.CurrentToken().Range, "構造体/共用体中に宣言がありますが、宣言子がないためこの宣言は何の意味も持ちません。");
                     return null;
@@ -1597,16 +1639,17 @@ namespace AnsiCParser {
                         _tagScope.Add(ident.Raw, taggedType);
                         AddImplicitTypeDeclaration(ident, taggedType);
                     } else {
-                        if ((taggedType as TaggedType.EnumType).Members != null) {
+                        if ((taggedType.Unwrap() as TaggedType.EnumType).Members != null) {
                             throw new CompilerException.SpecificationErrorException(ident.Range, $"列挙型 {ident.Raw} は既に完全型として定義されています。");
                         }
                     }
 
                     // 不完全型として定義されているので完全型にするために書き換え対象とする
-                    (taggedType as TaggedType.EnumType).Members = EnumeratorList(taggedType as TaggedType.EnumType);
+                    (taggedType.Unwrap() as TaggedType.EnumType).Members = EnumeratorList(taggedType.Unwrap() as TaggedType.EnumType);
+                    (taggedType.Unwrap() as TaggedType.EnumType).UpdateSelectedType();
                     _lexer.ReadToken('}');
                 } else {
-                    if ((taggedType as TaggedType.EnumType).Members == null) {
+                    if ((taggedType.Unwrap() as TaggedType.EnumType).Members == null) {
                         throw new CompilerException.SpecificationErrorException(ident.Range, $"不完全型の列挙型 {ident.Raw} を使用していますが、これはC言語の標準規格では認められおらず、未定義の動作となります（ISO/IEC 9899：1999：6.7.2.3の制約を参照）。（捕捉：GNU拡張では不完全型の列挙型の前方宣言を認めています。）");
                     }
                 }
@@ -1618,6 +1661,7 @@ namespace AnsiCParser {
                 AddImplicitTypeDeclaration(new Token(Token.TokenKind.IDENTIFIER, _lexer.CurrentToken().Start, _lexer.CurrentToken().Start, ident), etype);
                 _lexer.ReadToken('{');
                 EnumeratorList(etype);
+                etype.UpdateSelectedType();
                 _lexer.ReadToken('}');
                 return etype;
             }
@@ -1683,7 +1727,10 @@ namespace AnsiCParser {
                 if (value.HasValue == false) {
                     throw new CompilerException.SpecificationErrorException(expr.LocationRange, "列挙定数の値に定数演算できない値が指定されました。");
                 }
-                i = (int)value.Value;
+                if (value  < Int32.MinValue || Int32.MaxValue < value) {
+                    throw new CompilerException.SpecificationErrorException(expr.LocationRange, $"列挙定数の値ははint型で表現できる値（{Int32.MinValue}以上、{Int32.MaxValue}以下）でなければなりません。");
+                }
+                i = (Int32)value.Value;
             }
             return new TaggedType.EnumType.MemberInfo(enumType, ident, i);
         }
@@ -2195,7 +2242,7 @@ namespace AnsiCParser {
         private Initializer Initializer(CType type, bool isLocalVariableInit) {
             var init = InitializerItem();
             var results = Builder.parsing(type, init, isLocalVariableInit);
-            return new Initializer.ConcreteInitializer(init.LocationRange, init, results);
+            return new Initializer.ConcreteInitializer(init.LocationRange, type, init, results);
             //return InitializerChecker.CheckInitializer(type, init, isLocalVariableInit);
         }
 
@@ -2449,11 +2496,12 @@ namespace AnsiCParser {
                     var tyConstStr = new TypeQualifierType(new PointerType(new TypeQualifierType(CType.CreateChar(), DataType.TypeQualifier.Const)), DataType.TypeQualifier.Const);
                     var varDecl = new Declaration.VariableDeclaration(LocationRange.Builtin, "__func__", tyConstStr, AnsiCParser.StorageClassSpecifier.Static);
                     var initExpr = new SyntaxTree.Expression.PrimaryExpression.StringExpression(LocationRange.Empty, AllocStringLabel(), new List<string> { "\"" + funcName + "\"" });
-                    //varDecl.Init = new Initializer.ConcreteInitializer(LocationRange.Builtin, null, new[] { new Result() { path = new Tuple<CType, int>[0], expr = initExpr } });
-                    varDecl.Init = new Initializer.SimpleInitializer(LocationRange.Builtin, initExpr);
+                    varDecl.Init = new Initializer.ConcreteInitializer(LocationRange.Builtin, initExpr.Type, new Initializer.SimpleInitializer(LocationRange.Builtin,initExpr), new[] { new InitializeCommand() { path = new[] { new TyNav.PathPart(tyConstStr,-1) }, expr = initExpr } });
+                    //varDecl.Init = new Initializer.SimpleInitializer(LocationRange.Builtin, initExpr);
+
                     _identScope.Add("__func__", varDecl);
                     decls.Add(varDecl);
-                    varDecl.LinkageObject = _linkageObjectTable.RegistLinkageObject(tok, LinkageKind.NoLinkage, varDecl, true);
+                    varDecl.LinkageObject = _linkageObjectTable.RegistLinkageObject(tok, Kind.NoLinkage, varDecl, true);
                 }
 
                 while (_lexer.PeekToken('}') == false) {
@@ -2809,7 +2857,7 @@ namespace AnsiCParser {
                 var e = Expression();
                 _lexer.ReadToken(')');
                 var end = _lexer.CurrentToken().End;
-#warning 式 e に ParenthesesExpressionフラグを付けるよう変更
+                e.EnclosedInParentheses = true;
                 var expr = e;// new Expression.PrimaryExpression.EnclosedInParenthesesExpression(new LocationRange(start, end), e);
                 return expr;
             }
@@ -3055,6 +3103,27 @@ namespace AnsiCParser {
                             return new SyntaxTree.Expression.SizeofExpression(new LocationRange(tok.Start, expr.LocationRange.End), expr);
                         }
                     }
+                case Token.TokenKind._Alignof: {
+                        Logger.Warning(tok.Start, tok.End, "_Alignof演算子はC11以降で利用できます。");
+                        _lexer.NextToken();
+                        if (_lexer.PeekToken('(')) {
+                            // どちらにも'('の出現が許されるためさらに先読みを行う。
+                            _lexer.SaveContext();
+                            _lexer.ReadToken('(');
+                            if (IsTypeName()) {
+                                _lexer.DiscardSavedContext();
+                                var type = TypeName();
+                                var end = _lexer.ReadToken(')');
+                                return new SyntaxTree.Expression.AlignofExpression(new LocationRange(tok.Start, tok.End), type);
+                            } else {
+                                // 式
+                                throw new CompilerException.SpecificationErrorException(new LocationRange(tok.Start, tok.End), $"_Alignof演算子は型のみを対象とします。");
+                            }
+                        } else {
+                            // 括弧がないので式
+                            throw new CompilerException.SpecificationErrorException(new LocationRange(tok.Start, tok.End), $"_Alignof演算子は型のみを対象とします。");
+                        }
+                    }
                 default:
                     return PostfixExpression();
 
@@ -3075,11 +3144,22 @@ namespace AnsiCParser {
                     _lexer.DiscardSavedContext();
                     var type = TypeName();
                     _lexer.ReadToken(')');
-                    var expr = CastExpression();
-                    if (expr.Type.IsArrayType()) {
-                        expr = Specification.ToPointerTypeExpr(expr);
+                    if (_lexer.PeekToken('{')) {
+                        // c99 複合リテラル
+                        // 初期化子を読み取る
+                        // NoLinkageでBlockScopeかつ、storageclassがstaticで無い場合に限り、定数ではない初期化式が使える
+                        var init = InitializerItem();
+                        //var results = Builder.parsing(type, init, scope == ScopeKind.BlockScope && linkage == Kind.NoLinkage && storageClass != AnsiCParser.StorageClassSpecifier.Static);
+                        var results = Builder.parsing(type, init, true);
+                        return new SyntaxTree.Expression.PrimaryExpression.CompoundLiteralExpression(_lexer.CurrentToken().Range, type, init, results);
+                    } else {
+
+                        var expr = CastExpression();
+                        if (expr.Type.IsArrayType() || expr.Type.IsFunctionType()) {
+                            expr = Specification.ToPointerTypeExpr(expr);
+                        }
+                        return new SyntaxTree.Expression.CastExpression(new LocationRange(tok.Start, expr.LocationRange.End), type, expr);
                     }
-                    return new SyntaxTree.Expression.CastExpression(new LocationRange(tok.Start, expr.LocationRange.End), type, expr);
                 }
 
                 _lexer.RestoreSavedContext();
@@ -3623,8 +3703,8 @@ namespace AnsiCParser {
             }
 
             // 記憶域クラス指定からリンケージを求める(関数の場合は、外部結合もしくは内部結合のどれかとなり、無結合はない)
-            LinkageKind linkage = ResolveLinkage(ident, type, storageClass, scope, _identScope, false);
-            Debug.Assert(linkage == LinkageKind.ExternalLinkage || linkage == LinkageKind.InternalLinkage);
+            Kind linkage = ResolveLinkage(ident, type, storageClass, scope, _identScope, false);
+            Debug.Assert(linkage == Kind.ExternalLinkage || linkage == Kind.InternalLinkage);
 
             // その識別子の以前の宣言が可視であるか？
             Declaration iv;
@@ -3636,16 +3716,16 @@ namespace AnsiCParser {
                 // 識別子が無結合である場合，その識別子の宣言（宣言子又は型指定子の中の）が同じ有効範囲及び同じ名前空間の中で，二つ以上あってはならない。
                 // （捕捉：「識別子が無結合である場合」は以前の宣言の識別子にも適用される。つまり、一度でも無結合であると宣言された識別子については再宣言できない。）
                 // 参考文献: https://stackoverflow.com/questions/7239911/block-scope-linkage-c-standard
-                if ((linkage == LinkageKind.NoLinkage || iv.LinkageObject.Linkage == LinkageKind.NoLinkage) && isCurrent) {
+                if ((linkage == Kind.NoLinkage || iv.LinkageObject.Linkage == Kind.NoLinkage) && isCurrent) {
                     throw new CompilerException.SpecificationErrorException(ident.Range,
                         $"{iv.LocationRange.ToString()} で 無結合 として宣言された識別子 {ident.Raw} が同じ有効範囲及び同じ名前空間の中で再度宣言されています。" +
                         "識別子が無結合である場合，その識別子の宣言（宣言子又は型指定子の中の）が同じ有効範囲及び同じ名前空間の中で，二つ以上あってはなりません。");
                 }
 
                 // 翻訳単位の中で同じ識別子が内部結合と外部結合の両方で現れた場合，その動作は未定義とする。
-                if ((iv.LinkageObject.Linkage == LinkageKind.InternalLinkage && linkage == LinkageKind.ExternalLinkage)
-                    || (iv.LinkageObject.Linkage == LinkageKind.ExternalLinkage && linkage == LinkageKind.InternalLinkage)) {
-                    throw new CompilerException.SpecificationErrorException(ident.Range, $"{iv.LocationRange.ToString()} で {(iv.LinkageObject.Linkage == LinkageKind.InternalLinkage ? "内部結合" : "外部結合")} として宣言された識別子 {ident.Raw} が {(linkage == LinkageKind.InternalLinkage ? "内部結合" : "外部結合")} として再宣言されています。" +
+                if ((iv.LinkageObject.Linkage == Kind.InternalLinkage && linkage == Kind.ExternalLinkage)
+                    || (iv.LinkageObject.Linkage == Kind.ExternalLinkage && linkage == Kind.InternalLinkage)) {
+                    throw new CompilerException.SpecificationErrorException(ident.Range, $"{iv.LocationRange.ToString()} で {(iv.LinkageObject.Linkage == Kind.InternalLinkage ? "内部結合" : "外部結合")} として宣言された識別子 {ident.Raw} が {(linkage == Kind.InternalLinkage ? "内部結合" : "外部結合")} として再宣言されています。" +
                                                                                          $"翻訳単位の中で同じ識別子が内部結合と外部結合の両方で現れた場合の動作は未定義です。");
                 }
 
@@ -3718,7 +3798,7 @@ namespace AnsiCParser {
         private Declaration.VariableDeclaration VariableDeclaration(Token ident, CType type, StorageClassSpecifier storageClass, ScopeKind scope, bool hasInitializer) {
 
             // 記憶域クラス指定からリンケージを求める
-            LinkageKind linkage = ResolveLinkage(ident, type, storageClass, scope, _identScope, hasInitializer);
+            Kind linkage = ResolveLinkage(ident, type, storageClass, scope, _identScope, hasInitializer);
 
             // その識別子の以前の宣言が可視であるか？
             Declaration iv;
@@ -3731,17 +3811,17 @@ namespace AnsiCParser {
                 // 識別子が無結合である場合，その識別子の宣言（宣言子又は型指定子の中の）が同じ有効範囲及び同じ名前空間の中で，二つ以上あってはならない。
                 // （捕捉：「識別子が無結合である場合」は以前の宣言の識別子にも適用される。つまり、一度でも無結合であると宣言された識別子については再宣言できない。）
                 // 参考文献: https://stackoverflow.com/questions/7239911/block-scope-linkage-c-standard
-                if ((linkage == LinkageKind.NoLinkage || iv.LinkageObject.Linkage == LinkageKind.NoLinkage) && isCurrent) {
+                if ((linkage == Kind.NoLinkage || iv.LinkageObject.Linkage == Kind.NoLinkage) && isCurrent) {
                     throw new CompilerException.SpecificationErrorException(ident.Range, "識別子が無結合である場合，その識別子の宣言（宣言子又は型指定子の中の）が同じ有効範囲及び同じ名前空間の中で，二つ以上あってはならない。");
                 }
 
                 // 翻訳単位の中で同じ識別子が内部結合と外部結合の両方で現れた場合，その動作は未定義とする。
-                if ((iv.LinkageObject.Linkage == LinkageKind.InternalLinkage && linkage == LinkageKind.ExternalLinkage)
-                    || (iv.LinkageObject.Linkage == LinkageKind.ExternalLinkage && linkage == LinkageKind.InternalLinkage)) {
+                if ((iv.LinkageObject.Linkage == Kind.InternalLinkage && linkage == Kind.ExternalLinkage)
+                    || (iv.LinkageObject.Linkage == Kind.ExternalLinkage && linkage == Kind.InternalLinkage)) {
                     throw new CompilerException.SpecificationErrorException(ident.Range, $"翻訳単位の中で同じ識別子{ident.Raw}が内部結合と外部結合の両方で現れました。この場合の動作は未定義です。");
                 }
 
-                if (linkage != LinkageKind.NoLinkage) {
+                if (linkage != Kind.NoLinkage) {
                     // 以前の宣言が変数定義でないならばエラー
                     if (iv is Declaration.VariableDeclaration == false) {
                         throw new CompilerException.TypeMissmatchError(ident.Start, ident.End, $"{ident.Raw}は既に変数以外として宣言されています。");
@@ -3772,6 +3852,7 @@ namespace AnsiCParser {
                 }
 
             }
+            
             // 新たに変数宣言を作成
             var varDecl = new Declaration.VariableDeclaration(ident.Range, ident.Raw, type, storageClass/*, initializer*/);
             varDecl.LinkageObject = _linkageObjectTable.RegistLinkageObject(ident, linkage, varDecl, hasInitializer);
@@ -3788,13 +3869,13 @@ namespace AnsiCParser {
 
                 // 6.7.8 初期化
                 // 識別子の宣言がブロック有効範囲をもち，かつ識別子が外部結合又は内部結合をもつ場合，その宣言にその識別子に対する初期化子があってはならない。
-                if ((scope == ScopeKind.BlockScope) && (linkage == LinkageKind.InternalLinkage || linkage == LinkageKind.ExternalLinkage)) {
+                if ((scope == ScopeKind.BlockScope) && (linkage == Kind.InternalLinkage || linkage == Kind.ExternalLinkage)) {
                     throw new CompilerException.SpecificationErrorException(ident.Range, "識別子の宣言がブロック有効範囲をもち，かつ識別子が外部結合又は内部結合をもつ場合，その宣言にその識別子に対する初期化子があってはならない。");
                 }
 
                 // 初期化子を読み取る
                 // NoLinkageでBlockScopeかつ、storageclassがstaticで無い場合に限り、定数ではない初期化式が使える
-                initializer = Initializer(type, scope == ScopeKind.BlockScope && linkage == LinkageKind.NoLinkage && storageClass != AnsiCParser.StorageClassSpecifier.Static);
+                initializer = Initializer(type, scope == ScopeKind.BlockScope && linkage == Kind.NoLinkage && storageClass != AnsiCParser.StorageClassSpecifier.Static);
                 varDecl.Init = initializer;
 
             } else {
@@ -3807,7 +3888,7 @@ namespace AnsiCParser {
             }
 
             // オブジェクトの識別子が無結合で宣言されている場合，オブジェクトの型は，その宣言子の終わりまで に，又は初期化宣言子の終わりまで（その宣言子が初期化子をもつとき）に，完全になっていなければならない。
-            if (!isVisiblePrevDecl && linkage == LinkageKind.NoLinkage) {
+            if (!isVisiblePrevDecl && linkage == Kind.NoLinkage) {
                 if (type.IsIncompleteType()) {
                     throw new CompilerException.TypeMissmatchError(ident.Start, ident.End, $"不完全型の変数 {ident.Raw} が使われています。");
                 }
@@ -3955,8 +4036,12 @@ namespace AnsiCParser {
                 var expr = ConstantExpression();
                 var ret = ExpressionEvaluator.Eval(expr);
                 var size = ExpressionEvaluator.ToLong(ret);
-                if (size.HasValue == false || size < 0) {
-                    throw new CompilerException.SpecificationErrorException(expr.LocationRange, "配列の要素数には0以上の整数値を指定してください。");
+                if (size.HasValue == false || size <= 0) {
+                    // 6.7.5.2 配列宣言子 
+                    // [及び]の間には，省略可能な型修飾子及びキーワードstaticに加え，式又は*を置くことができる。
+                    // [及び]が（配列の大きさを指定する）式を囲む場合，その式の型は整数型でなければならない。
+                    // 式が定数式の場合，その値は0より大きくなければならない。
+                    throw new CompilerException.SpecificationErrorException(expr.LocationRange, "配列宣言子の要素数を示す定数式の値は0より大きくなければならない。");
                 }
                 len = (int)size.Value;
             }

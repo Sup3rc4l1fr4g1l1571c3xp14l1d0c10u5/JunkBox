@@ -456,9 +456,9 @@ namespace AnsiCParser.SyntaxTree {
                 throw new NotImplementedException();
             }
 
-            public Expression OnEnclosedInParenthesesExpression(Expression.PrimaryExpression.EnclosedInParenthesesExpression self, Expression value) {
-                return self.ParenthesesExpression.Accept(this, value);
-            }
+            //public Expression OnEnclosedInParenthesesExpression(Expression.PrimaryExpression.EnclosedInParenthesesExpression self, Expression value) {
+            //    return self.ParenthesesExpression.Accept(this, value);
+            //}
 
             public Expression OnEnumerationConstant(Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant self, Expression value) {
                 return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", self.Info.Value, ((BasicType)self.Type.Unwrap()).Kind);
@@ -785,7 +785,7 @@ namespace AnsiCParser.SyntaxTree {
                         if (v.Item1 != null) {
                             return new Expression.PrimaryExpression.AddressConstantExpression(self.LocationRange, v.Item1, self.Type, new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", v.Item2, ((BasicType)self.Type.Unwrap()).Kind));
                         } else {
-                            return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", v.Item2, self.Type.IsEnumeratedType() ? BasicType.TypeKind.SignedInt : ((BasicType)self.Type.Unwrap()).Kind);
+                            return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", v.Item2, self.Type.IsEnumeratedType() ? ((self.Type.Unwrap() as TaggedType.EnumType).SelectedType.Kind) : ((BasicType)self.Type.Unwrap()).Kind);
                         }
                     } else {
                         return e;
@@ -798,7 +798,7 @@ namespace AnsiCParser.SyntaxTree {
                         if (v.Item1 != null) {
                             throw new CompilerException.InternalErrorException(self.LocationRange, "コンパイル時定数ではない浮動小数点式から整数型への変換が行われています。");
                         } else {
-                            return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", v.Item2, self.Type.IsEnumeratedType() ? BasicType.TypeKind.SignedInt : ((BasicType)self.Type.Unwrap()).Kind);
+                            return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", v.Item2, self.Type.IsEnumeratedType() ? ((self.Type.Unwrap() as TaggedType.EnumType).SelectedType.Kind) : ((BasicType)self.Type.Unwrap()).Kind);
                         }
                     } else {
                         return e;
@@ -958,6 +958,15 @@ namespace AnsiCParser.SyntaxTree {
 
             public Expression OnConcreteInitializer(Initializer.ConcreteInitializer self, Expression value) {
                 throw new NotImplementedException();
+            }
+
+            public Expression OnCompoundLiteralExpression(Expression.PrimaryExpression.CompoundLiteralExpression self, Expression value) {
+                return self;
+                //throw new NotImplementedException();
+            }
+
+            public Expression OnAlignofExpression(Expression.AlignofExpression self, Expression value) {
+                return new Expression.PrimaryExpression.Constant.IntegerConstant(self.LocationRange, "", self.TypeOperand.AlignOf(), ((BasicType)self.Type.Unwrap()).Kind);
             }
         }
 

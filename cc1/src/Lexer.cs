@@ -17,7 +17,8 @@ namespace AnsiCParser {
         /// <summary>
         /// pragma pack 指令に一致する正規表現。
         /// </summary>
-        private static Regex RegexPackDirective { get; } = new Regex(@"^#\s*(pragma\s+)(pack(\s*\(\s*(?<packsize>[0124])?\s*\)|\s*\s*(?<packsize>[0124])?\s*)?\s*)$");
+        private static Regex RegexPackDirective { get; } = new Regex(@"^#\s*pragma\s+pack\s*(\(\s*((?<packsize>\d+)|(?<op>push)(\s*,\s*(?<packsize>\d+))|(?<op>pop))\s*\)|(?<packsize>\d+))\s*$");//^#\s*(pragma\s+)(pack(\s*\(\s*(?<packsize>[0124])?\s*\)|\s*\s*(?<packsize>[0124])?\s*)?\s*)$");
+        // 
 
         /// <summary>
         /// 10進数文字に一致する正規表現。
@@ -984,6 +985,7 @@ namespace AnsiCParser {
             {"far" , Token.TokenKind.FAR},
             {"__asm__" , Token.TokenKind.__ASM__},
             {"__volatile__" , Token.TokenKind.__VOLATILE__},
+            {"__alignof__" , Token.TokenKind._Alignof},
         };
 
         /// <summary>
@@ -1308,16 +1310,58 @@ namespace AnsiCParser {
                     }
                     {
                         // pragma pack 指令
+                        // #pragma pack ( <packsize> )
+                        // #pragma pack ( push, <packsize> )
+                        // #pragma pack ( push )
+                        // #pragma pack ( pop )
+                        // #pragma pack ()
+                        // #pragma pack <packsize>
+                        // #pragma pack push
+                        // #pragma pack pop
+                        // #pragma pack
+
                         // プラグマ後の最初の struct、union、宣言から有効
-                        var match = RegexPackDirective.Match(str);
-                        if (match.Success) {
-                            if (match.Groups["packsize"].Success) {
-                                Settings.PackSize = int.Parse(match.Groups["packsize"].Value);
-                            } else {
-                                Settings.PackSize = 0;
+                        var scanner = new StringScanner(str);
+                        if (scanner.Read(new Regex(@"\s*#\s*pragma\s+pack\s*"))) {
+                            var quote = false;
+                            var op = "";
+                            var pack = -1;
+                            if (scanner.Read(new Regex(@"\(\s*"))) {
+                                quote = true;
                             }
+                            Match m = null;
+                            if (scanner.Read(new Regex(@"\s*push\s*"))) {
+                                op = "push";
+                                if (quote && scanner.Read(new Regex(@"\s*,\s*(?<packsize>\d+)\s*"), out m)) {
+                                    pack = int.Parse(m.Groups["packsize"].Value);
+                                } else {
+                                    pack = 0;
+                                }
+                            } else if (scanner.Read(new Regex(@"\s*pop\s*"))) {
+                                op = "pop";
+                                pack = 0;
+                            } else if (scanner.Read(new Regex(@"\s*(?<packsize>\d+)\s*"), out m)) {
+                                pack = int.Parse(m.Groups["packsize"].Value);
+                            } else {
+                                pack = 0;
+                            }
+
+                            if (quote) {
+                                if (scanner.Read(new Regex(@"\)\s*")) == false) {
+                                    Logger.Warning(start.Item1, end.Item1, "#pragma pack指令の閉じ括弧がありません。pragma全体を読み飛ばします。");
+                                    goto rescan;
+                                }
+                            }
+                            if (scanner.IsEoS() == false) {
+                                Logger.Warning(start.Item1, end.Item1, "解釈できない書式の指令です。pragma全体を読み飛ばします。");
+                            } else {
+                                Settings.PackSize = pack;
+                            }
+                            goto rescan;
                         }
                     }
+
+                    Logger.Warning(start.Item1, end.Item1, "解釈できない書式の指令です。pragma全体を読み飛ばします。");
                     goto rescan;
                 } else {
                     throw new CompilerException.SyntaxErrorException(GetCurrentLocation(), GetCurrentLocation(), "前処理指令が出現できない位置に # が存在しています。");
@@ -1684,6 +1728,62 @@ namespace AnsiCParser {
         /// <returns></returns>
         public void RestoreSavedContext() {
             _currentTokenPos = _contextSaveStack.Pop();
+        }
+    }
+
+    public class StringScanner {
+        private readonly string str;
+        private string subs;
+
+        public StringScanner(string s) {
+            this.str = s;
+            this.subs = s;
+        }
+
+        public bool Read(string str) {
+            if (this.subs.StartsWith(str)) {
+                this.subs = this.subs.Substring(str.Length);
+                return true;
+            } else {
+                return false;
+            }
+        }
+        public bool IsEoS() {
+            return this.subs.Length == 0;
+        }
+        public bool Read(Regex regex) {
+            Match m;
+            return Read(regex, out m);
+        }
+        public bool Read(Regex regex, out Match m) {
+            regex = new Regex("^" + regex.ToString());
+            m = regex.Match(this.subs);
+            if (m.Success) {
+                this.subs = this.subs.Substring(m.Value.Length);
+                return true;
+            } else {
+                return false;
+            }
+        }
+        public bool Peek(string str) {
+            if (this.subs.StartsWith(str)) {
+                return true;
+            } else {
+                return false;
+            }
+        }
+        public bool Peek(Regex regex) {
+            Match m;
+            return Peek(regex, out m);
+        }
+        public bool Peek(Regex regex, out Match m) {
+            regex = new Regex("^" + regex.ToString());
+            m = regex.Match(this.subs);
+            if (m.Success) {
+                return true;
+            } else {
+                return false;
+            }
         }
     }
 }

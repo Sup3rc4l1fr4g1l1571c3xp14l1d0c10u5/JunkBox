@@ -3,9 +3,14 @@ using System;
 namespace AnsiCParser {
     public static class Settings {
         /// <summary>
-        /// 構造体メンバのアライメント値
+        /// 構造体メンバのパッキングアライメント値（0はデフォルト。0以外は構造体のメンバのアライメントを指定したものとなり、ビットフィールドは隙間なしになる。）
         /// </summary>
         public static int PackSize { get; set; } = 0;
+
+        /// <summary>
+        /// 構造体のアライメント値（構造体自体のサイズのアライメント）
+        /// </summary>
+        public static int AlignSize { get; set; } = 0;
 
         /// <summary>
         /// Ｃ言語規格

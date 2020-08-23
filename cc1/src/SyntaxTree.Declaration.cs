@@ -1,4 +1,5 @@
 using AnsiCParser.DataType;
+using AnsiCParser.Linkage;
 
 namespace AnsiCParser.SyntaxTree {
 
@@ -32,7 +33,7 @@ namespace AnsiCParser.SyntaxTree {
         /// <summary>
         /// 宣言と対応するリンケージ情報
         /// </summary>
-        public LinkageObject LinkageObject {
+        public Object LinkageObject {
             get; set;
         }
 
@@ -81,7 +82,7 @@ namespace AnsiCParser.SyntaxTree {
             public FunctionDeclaration(LocationRange locationRange, string ident, CType type, StorageClassSpecifier storageClass, FunctionSpecifier functionSpecifier) : base(locationRange, ident, type, storageClass) {
                 Body = null;
                 FunctionSpecifier = functionSpecifier;
-                LinkageObject = LinkageObject.Create(this, LinkageKind.None);
+                LinkageObject = Object.Create(this, Kind.None);
             }
         }
 
@@ -108,7 +109,7 @@ namespace AnsiCParser.SyntaxTree {
             /// <param name="init"></param>
             public VariableDeclaration(LocationRange locationRange, string ident, CType type, StorageClassSpecifier storageClass/*, Initializer init*/) : base(locationRange, ident, type, storageClass) {
                 Init = null;//init;
-                LinkageObject = LinkageObject.Create(this, LinkageKind.None);
+                LinkageObject = Object.Create(this, Kind.None);
             }
         }
 
@@ -127,7 +128,7 @@ namespace AnsiCParser.SyntaxTree {
             /// <param name="storageClass"></param>
             public ArgumentDeclaration(LocationRange locationRange, string ident, CType type, StorageClassSpecifier storageClass)
                 : base(locationRange, ident, type, storageClass) {
-                LinkageObject = LinkageObject.Create(this, LinkageKind.NoLinkage);
+                LinkageObject = Object.Create(this, Kind.NoLinkage);
             }
         }
 
@@ -143,7 +144,7 @@ namespace AnsiCParser.SyntaxTree {
             /// <param name="ident"></param>
             /// <param name="type"></param>
             public TypeDeclaration(LocationRange locationRange, string ident, CType type) : base(locationRange, ident, type, StorageClassSpecifier.None) {
-                LinkageObject = LinkageObject.Create(this, LinkageKind.NoLinkage);
+                LinkageObject = Object.Create(this, Kind.NoLinkage);
             }
         }
 
@@ -164,7 +165,7 @@ namespace AnsiCParser.SyntaxTree {
             /// <param name="mi"></param>
             public EnumMemberDeclaration(LocationRange locationRange, TaggedType.EnumType.MemberInfo mi) : base(locationRange, mi.Ident.Raw, CType.CreateSignedInt(), StorageClassSpecifier.None) {
                 MemberInfo = mi;
-                LinkageObject = LinkageObject.Create(this, LinkageKind.NoLinkage);
+                LinkageObject = Object.Create(this, Kind.NoLinkage);
             }
 
             /// <summary>

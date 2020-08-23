@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.Remoting.Metadata.W3cXsd2001;
+
 namespace AnsiCParser {
 
     namespace DataType {
@@ -36,8 +38,10 @@ namespace AnsiCParser {
                     Union
                 }
 
-                public StructUnionType(StructOrUnion kind, string tagName, bool isAnonymous) : base(tagName, isAnonymous) {
+                public StructUnionType(StructOrUnion kind, string tagName, bool isAnonymous, int packSize, int alignSize) : base(tagName, isAnonymous) {
                     Kind = kind;
+                    PackSize = packSize;
+                    AlignSize = alignSize;
                 }
 
                 public StructOrUnion Kind {
@@ -62,7 +66,12 @@ namespace AnsiCParser {
                 /// <summary>
                 /// 型アライメント
                 /// </summary>
-                private int _align;
+                public int AlignSize { get; private set;  }
+
+                /// <summary>
+                /// パックサイズ（アライメント設定サイズ）
+                /// </summary>
+                public int PackSize { get; }
 
                 /// <summary>
                 /// フレキシブル配列メンバを持つ構造体を含むか判定
@@ -74,10 +83,9 @@ namespace AnsiCParser {
 
 
                 public override CType Duplicate() {
-                    return new StructUnionType(Kind, TagName, IsAnonymous) {
+                    return new StructUnionType(Kind, TagName, IsAnonymous, PackSize, AlignSize) {
                         Members = Members.Select(x => x.Duplicate()).ToList(),
                         _size = _size,
-                        _align = _align,
                         HasFlexibleArrayMember = HasFlexibleArrayMember
                     };
                 }
@@ -129,48 +137,48 @@ namespace AnsiCParser {
                     /// <returns></returns>
                     protected List<MemberInfo> CreateBytePaddingMemberInfo(List<MemberInfo> result, int size, int bytePos) {
                         CType ty;
-                        switch (size) {
-                            case 1:
-                                ty = CreateUnsignedChar();
-                                result.Add(new MemberInfo(null, ty, bytePos));
-                                break;
-                            case 2:
-                                ty = CreateUnsignedShortInt();
-                                result.Add(new MemberInfo(null, ty, bytePos));
-                                break;
-                            case 3:
-                                ty = CreateUnsignedChar();
-                                result.Add(new MemberInfo(null, ty, bytePos));
-                                ty = CreateUnsignedShortInt();
-                                result.Add(new MemberInfo(null, ty, bytePos + 1));
-                                break;
-                            case 4:
-                                ty = CreateUnsignedLongInt();
-                                result.Add(new MemberInfo(null, ty, bytePos));
-                                break;
-                            case 5:
-                                ty = CreateUnsignedChar();
-                                result.Add(new MemberInfo(null, ty, bytePos));
-                                ty = CreateUnsignedLongInt();
-                                result.Add(new MemberInfo(null, ty, bytePos + 1));
-                                break;
-                            case 6:
-                                ty = CreateUnsignedShortInt();
-                                result.Add(new MemberInfo(null, ty, bytePos));
-                                ty = CreateUnsignedLongInt();
-                                result.Add(new MemberInfo(null, ty, bytePos + 2));
-                                break;
-                            case 7:
-                                ty = CreateUnsignedChar();
-                                result.Add(new MemberInfo(null, ty, bytePos));
-                                ty = CreateUnsignedShortInt();
-                                result.Add(new MemberInfo(null, ty, bytePos + 1));
-                                ty = CreateUnsignedLongInt();
-                                result.Add(new MemberInfo(null, ty, bytePos + 3));
-                                break;
-                            default:
-                                throw new Exception("");
-                        }
+                            switch (size) {
+                                case 1:
+                                    ty = CreateUnsignedChar();
+                                    result.Add(new MemberInfo(null, ty, bytePos));
+                                    break;
+                                case 2:
+                                    ty = CreateUnsignedShortInt();
+                                    result.Add(new MemberInfo(null, ty, bytePos));
+                                    break;
+                                case 3:
+                                    ty = CreateUnsignedChar();
+                                    result.Add(new MemberInfo(null, ty, bytePos));
+                                    ty = CreateUnsignedShortInt();
+                                    result.Add(new MemberInfo(null, ty, bytePos + 1));
+                                    break;
+                                case 4:
+                                    ty = CreateUnsignedLongInt();
+                                    result.Add(new MemberInfo(null, ty, bytePos));
+                                    break;
+                                case 5:
+                                    ty = CreateUnsignedChar();
+                                    result.Add(new MemberInfo(null, ty, bytePos));
+                                    ty = CreateUnsignedLongInt();
+                                    result.Add(new MemberInfo(null, ty, bytePos + 1));
+                                    break;
+                                case 6:
+                                    ty = CreateUnsignedShortInt();
+                                    result.Add(new MemberInfo(null, ty, bytePos));
+                                    ty = CreateUnsignedLongInt();
+                                    result.Add(new MemberInfo(null, ty, bytePos + 2));
+                                    break;
+                                case 7:
+                                    ty = CreateUnsignedChar();
+                                    result.Add(new MemberInfo(null, ty, bytePos));
+                                    ty = CreateUnsignedShortInt();
+                                    result.Add(new MemberInfo(null, ty, bytePos + 1));
+                                    ty = CreateUnsignedLongInt();
+                                    result.Add(new MemberInfo(null, ty, bytePos + 3));
+                                    break;
+                                default:
+                                    throw new Exception("");
+                            }
                         return result;
                     }
 
@@ -199,9 +207,111 @@ namespace AnsiCParser {
                     /// </summary>
                     /// <param name="members">メンバー情報</param>
                     /// <returns>(構造体のサイズ、構造体のアラインメント、メンバー情報（レイアウト情報が書き込まれた結果)</returns>
-                    public abstract Tuple<int, int, List<MemberInfo>> Run(List<MemberInfo> members);
+                    public abstract Tuple<int, int, List<MemberInfo>> Run(List<MemberInfo> members, int packSize, int alignSize);
                 }
 
+                /// <summary>
+                /// PCCっぽい構造体レイアウト計算アルゴリズム
+                /// </summary>
+                protected class StructLayoutPcc : StructLayoutBase {
+                    private List<MemberInfo> CreateBitPaddingMemberInfo(List<MemberInfo> result, CType ty, int bytePos, sbyte bitPos, sbyte bitSize) {
+                        if (bytePos < 0 || bitSize <= 0) {
+                            throw new Exception("");
+                        } else {
+                            //result.Add(new MemberInfo(null, new BitFieldType(null, ty, bitPos, bitSize), bytePos));
+                            return result;
+                        }
+                    }
+
+                    /// <summary>
+                    /// 構造体のレイアウト計算を実行
+                    /// </summary>
+                    /// <param name="members"></param>
+                    /// <returns></returns>
+                    public override Tuple<int, int, List<MemberInfo>> Run(List<MemberInfo> members, int packSize, int alignSize) {
+                        var result = new List<MemberInfo>();
+                        BitFieldType bft;
+                        CType et;
+
+                        var currentBitPos = 0;
+                        var packBitSize = packSize * 8;
+                        var structureBitAlignment = alignSize * 8;
+
+                        for (var i= 0; i< members.Count; i++) {
+                            var member = members[i];
+                            var memberIdent = member.Ident;
+                            var memberBitAlign = (packBitSize == 0) ? member.Type.AlignOf() * 8 : member.Type.IsBitField(out bft) && bft.BitWidth == 0 ? member.Type.AlignOf() * 8 : packBitSize;
+                            var memberTypeBitSize =(member.Type.IsIncompleteType() && member.Type.IsArrayType(out et)) ? et.SizeOf() * 8 : (member.Type.SizeOf() * 8);
+                            var memberBitSize = member.Type.IsBitField(out bft) ? bft.BitWidth : (member.Type.IsIncompleteType() && member.Type.IsArrayType(out et)) ? et.SizeOf() * 8 : (member.Type.SizeOf() * 8);
+
+                            // 前方向で最も近いアライメント境界
+                            var headBitPos = currentBitPos - (currentBitPos % memberBitAlign);
+                            // 前方向で最も近いアライメント境界からの使用済みビット数
+                            var usedBitSize = currentBitPos - headBitPos;
+
+                            if (packBitSize == 0) {
+                                if ((memberTypeBitSize < usedBitSize + memberBitSize) || (member.Type.IsBitField() && memberBitSize == 0)) {
+                                    // 空き部分にメンバーを入れることができないので、次のアライメント境界まで切り上げる
+                                    //result = CreateBitPaddingMemberInfo(result, member.Type, headBitPos / 8, (sbyte)usedBitSize, (sbyte)freeBitSize);
+                                    currentBitPos = headBitPos + memberBitAlign;
+                                    headBitPos = currentBitPos;
+                                    usedBitSize = 0;
+                                }
+                            } else {
+                                // padding != 0の時はビットフィールドではない型は必ずアライメントに整列。ビットフィールドは詰める。
+                                if ((member.Type.IsBitField() == false && (currentBitPos != headBitPos)) || (member.Type.IsBitField() && memberBitSize == 0)) {
+                                    // 空き部分にメンバーを入れることができないので、次のアライメント境界まで切り上げる
+                                    //result = CreateBitPaddingMemberInfo(result, member.Type, headBitPos / 8, (sbyte)usedBitSize, (sbyte)freeBitSize);
+                                    currentBitPos = headBitPos + memberBitAlign;
+                                    headBitPos = currentBitPos;
+                                    usedBitSize = 0;
+                                }
+                            }
+                            if (memberBitSize != 0) {
+                                // メンバーを追加
+                                if (member.Type.IsBitField()) {
+                                    result = CreateMemberInfo(result, member.Type, memberIdent, headBitPos / 8, (sbyte)usedBitSize, (sbyte)memberBitSize);
+                                } else {
+                                    result = CreateMemberInfo(result, member.Type, memberIdent, headBitPos / 8, -1, -1);
+                                }
+
+                                if (i+1 == members.Count && member.Type.IsIncompleteType() && member.Type.IsArrayType()) {
+                                    // 最後のメンバーが不完全型配列の場合はそのメンバーのサイズを追加しない
+                                } else {
+                                    currentBitPos += memberBitSize;
+                                }
+
+                                // アライメント算出
+                                structureBitAlignment = Math.Max(structureBitAlignment, memberBitAlign);
+                            }
+                        }
+
+                        // 末尾の隙間を埋める
+                        var paddingBitSize = currentBitPos % 8;
+                        if (paddingBitSize > 0) {
+                            //result = CreateBitPaddingMemberInfo(result, CType.CreateUnsignedChar(), currentBitPos / 8, (sbyte)(currentBitPos%8), (sbyte)(8-paddingBitSize));
+                            currentBitPos += (8 - paddingBitSize);
+                        }
+
+                        // アライメントにサイズをそろえる
+                        if ((currentBitPos % structureBitAlignment) > 0) {
+                            var pad = PaddingOf(currentBitPos, structureBitAlignment);
+                            if ((pad % 8) > 0) { 
+                                //result = CreateBitPaddingMemberInfo(result, CType.CreateUnsignedChar(), currentBitPos / 8, (sbyte)(currentBitPos % 8), (sbyte)(pad % 8));
+                                currentBitPos += (pad % 8);
+                                pad -= (pad % 8);
+                            }
+                            if ((pad / 8) > 0) {
+                                //result = CreateBytePaddingMemberInfo(result, pad/8, currentBitPos/8);
+                            }
+                            currentBitPos += pad;
+                        }
+
+                        return Tuple.Create(currentBitPos / 8, structureBitAlignment / 8, result);
+
+
+                    }
+                }
                 /// <summary>
                 /// GCCっぽい構造体レイアウト計算アルゴリズム
                 /// </summary>
@@ -220,7 +330,7 @@ namespace AnsiCParser {
                     /// </summary>
                     /// <param name="members"></param>
                     /// <returns></returns>
-                    public override Tuple<int, int, List<MemberInfo>> Run(List<MemberInfo> members) {
+                    public override Tuple<int, int, List<MemberInfo>> Run(List<MemberInfo> members, int packSize, int alignSize) {
                         var result = new List<MemberInfo>();
 
                         CType currentBitfieldType = null;
@@ -235,7 +345,7 @@ namespace AnsiCParser {
                             var memberIdent = member.Ident;
                             var memberBitWidth = member.Type.IsBitField(out bft) ? bft.BitWidth : -1;
                             var memberType = member.Type.IsBitField(out bft) ? bft.Type : member.Type;
-                            var memberTypeAlign = Settings.PackSize == 0 ? memberType.AlignOf() : Math.Min(Settings.PackSize, memberType.AlignOf());
+                            var memberTypeAlign = packSize == 0 ? memberType.AlignOf() : Math.Min(packSize, memberType.AlignOf());
 
                             // 幅0のビットフィールドの挿入の場合
                             if ((memberBitWidth == 0)) {
@@ -324,7 +434,7 @@ namespace AnsiCParser {
                                     currentBitfieldSize = 0;
                                 } else {
                                     // ビットフィールドが連続している
-                                    if (Settings.PackSize == 0) {
+                                    if (packSize == 0) {
                                         // #pragma pack が未指定
                                         if ((currentBytePosition % currentBitfieldType.AlignOf()) == 0 && (currentBytePosition % memberTypeAlign) == 0) {
                                             // アラインメントが揃っている。
@@ -372,7 +482,7 @@ namespace AnsiCParser {
                                 result = CreateMemberInfo(result, memberType, memberIdent, currentBytePosition, 0, -1);
                                 currentBytePosition += memberSize;
                             } else if (memberBitWidth > 0) {
-                                if (Settings.PackSize == 0) {
+                                if (packSize == 0) {
                                     // ビットフィールド
                                     if (currentBitfieldType == null) {
                                         currentBitfieldType = memberType;
@@ -467,7 +577,7 @@ namespace AnsiCParser {
                         // - 上記より、構造体全体のサイズは構造体メンバの最大の境界調整の倍数となる
                         // 
                         // これは規格書には直接書いていないが、細かく読み取ると導出される。
-                        var structureAlignment = Settings.PackSize != 0 ? Settings.PackSize : members.Where(x => { BitFieldType bft2; return !(x.Type.IsBitField(out bft2) && bft2.BitWidth == 0); }).Select(x => x.Type.AlignOf()).Max();
+                        var structureAlignment = alignSize != 0 ? alignSize : members.Where(x => { BitFieldType bft2; return !(x.Type.IsBitField(out bft2) && bft2.BitWidth == 0); }).Select(x => x.Type.AlignOf()).Max();
                         if (structureAlignment != 0 && (currentBytePosition % structureAlignment) > 0) {
                             var pad = PaddingOf(currentBytePosition, structureAlignment);
                             result = CreateBytePaddingMemberInfo(result, pad, currentBytePosition);
@@ -497,7 +607,7 @@ namespace AnsiCParser {
                     /// </summary>
                     /// <param name="members"></param>
                     /// <returns></returns>
-                    public override Tuple<int, int, List<MemberInfo>> Run(List<MemberInfo> members) {
+                    public override Tuple<int, int, List<MemberInfo>> Run(List<MemberInfo> members, int packSize, int alignSize) {
                         var result = new List<MemberInfo>();
 
                         CType currentBitfieldType = null;
@@ -539,7 +649,7 @@ namespace AnsiCParser {
                                     }
                                 } else {
                                     // 境界調整を強制する
-                                    var pad = PaddingOf(currentBytePosition, Settings.PackSize == 0 ? type.AlignOf() : Math.Min(Settings.PackSize, type.AlignOf()));
+                                    var pad = PaddingOf(currentBytePosition, packSize == 0 ? type.AlignOf() : Math.Min(packSize, type.AlignOf()));
                                     if (pad > 0) {
                                         result = CreateBytePaddingMemberInfo(result, pad, currentBytePosition);
                                     }
@@ -582,7 +692,7 @@ namespace AnsiCParser {
 
                             // ビットフィールドが終了している場合、境界調整が必要か調べて境界調整を行う
                             if (currentBitfieldType == null) {
-                                var pad = PaddingOf(currentBytePosition, Settings.PackSize == 0 ? type.AlignOf() : Math.Min(Settings.PackSize, type.AlignOf()));
+                                var pad = PaddingOf(currentBytePosition, packSize == 0 ? type.AlignOf() : Math.Min(packSize, type.AlignOf()));
                                 if (pad > 0) {
                                     result = CreateBytePaddingMemberInfo(result, pad, currentBytePosition);
                                 }
@@ -665,7 +775,7 @@ namespace AnsiCParser {
                         // - 上記より、構造体全体のサイズは構造体メンバの最大の境界調整の倍数となる
                         // 
                         // これは規格書には直接書いていないが、細かく読み取ると導出される。
-                        var structureAlignment = members.Where(x => { BitFieldType bft2; return !(x.Type.IsBitField(out bft2) && bft2.BitWidth == 0); }).Select(x => x.Type.AlignOf()).Max();
+                        var structureAlignment = (alignSize != 0) ? alignSize : members.Where(x => { BitFieldType bft2; return !(x.Type.IsBitField(out bft2) && bft2.BitWidth == 0); }).Select(x => x.Type.AlignOf()).Max();
                         if (structureAlignment != 0 && (currentBytePosition % structureAlignment) > 0) {
                             var pad = PaddingOf(currentBytePosition, structureAlignment);
                             result = CreateBytePaddingMemberInfo(result, pad, currentBytePosition);
@@ -681,14 +791,14 @@ namespace AnsiCParser {
                 /// 共用体のレイアウト算出
                 /// </summary>
                 protected abstract class UnionLayoutBase {
-                    public abstract Tuple<int, int> Run(List<MemberInfo> members);
+                    public abstract Tuple<int, int> Run(List<MemberInfo> members, int alignSize);
                 }
 
                 /// <summary>
-                /// GCCっぽい共用体レイアウト計算アルゴリズム
+                /// PCCっぽい共用体レイアウト計算アルゴリズム
                 /// </summary>
-                protected class UnionLayoutGcc : UnionLayoutBase {
-                    public override Tuple<int, int> Run(List<MemberInfo> members) {
+                protected class UnionLayoutPcc : UnionLayoutBase {
+                    public override Tuple<int, int> Run(List<MemberInfo> members, int alignSize) {
                         var size = members.Max(x => {
                             BitFieldType bft;
                             if (x.Type.IsBitField(out bft)) {
@@ -697,7 +807,7 @@ namespace AnsiCParser {
                                 return x.Type.SizeOf();
                             }
                         });
-                        var align = members.Max(x => {
+                        var align = alignSize != 0 ? alignSize : members.Max(x => {
                             BitFieldType bft;
                             if (x.Type.IsBitField(out bft) && bft.BitWidth == 0) {
                                 return 0;
@@ -705,15 +815,42 @@ namespace AnsiCParser {
                                 return x.Type.AlignOf();
                             }
                         });
+                        var pad = StructLayoutBase.PaddingOf(size, align);
+                        size += pad;
                         return Tuple.Create(size, align);
                     }
                 }
+
+                ///// <summary>
+                ///// GCCっぽい共用体レイアウト計算アルゴリズム
+                ///// </summary>
+                //protected class UnionLayoutGcc : UnionLayoutBase {
+                //    public override Tuple<int, int> Run(List<MemberInfo> members) {
+                //        var size = members.Max(x => {
+                //            BitFieldType bft;
+                //            if (x.Type.IsBitField(out bft)) {
+                //                return (bft.BitOffset + bft.BitWidth + 7) / 8;
+                //            } else {
+                //                return x.Type.SizeOf();
+                //            }
+                //        });
+                //        var align = members.Max(x => {
+                //            BitFieldType bft;
+                //            if (x.Type.IsBitField(out bft) && bft.BitWidth == 0) {
+                //                return 0;
+                //            } else {
+                //                return x.Type.AlignOf();
+                //            }
+                //        });
+                //        return Tuple.Create(size, align);
+                //    }
+                //}
 
                 /// <summary>
                 /// MSVCっぽい共用体レイアウト計算アルゴリズム
                 /// </summary>
                 protected class UnionLayoutMscv : UnionLayoutBase {
-                    public override Tuple<int, int> Run(List<MemberInfo> members) {
+                    public override Tuple<int, int> Run(List<MemberInfo> members, int alignSize) {
                         var size = members.Max(x => {
                             BitFieldType bft;
                             if (x.Type.IsBitField(out bft)) {
@@ -722,7 +859,7 @@ namespace AnsiCParser {
                                 return x.Type.SizeOf();
                             }
                         });
-                        var align = members.Max(x => {
+                        var align = alignSize != 0 ? alignSize : members.Max(x => {
                             BitFieldType bft;
                             if (x.Type.IsBitField(out bft) && bft.BitWidth == 0) {
                                 return 0;
@@ -745,23 +882,17 @@ namespace AnsiCParser {
 
                     if (Kind == StructOrUnion.Struct) {
                         // 構造体型の場合
-                        var layout = new StructLayoutGcc();
-                        var ret = layout.Run(Members);
-                        if (this.HasFlexibleArrayMember) {
-                            _size = ret.Item1 - Members.Last().Type.SizeOf();   // フレキシブル配列メンバは最後の要素の型を無視する
-                            _align = ret.Item2;
-                            Members = ret.Item3;
-                        } else {
-                            _size = ret.Item1;
-                            _align = ret.Item2;
-                            Members = ret.Item3;
-                        }
+                        var layout = new StructLayoutPcc();
+                        var ret = layout.Run(Members, PackSize, AlignSize);
+                        _size = ret.Item1;
+                        AlignSize = ret.Item2;
+                        Members = ret.Item3;
                     } else {
                         // 共用体型のの場合
-                        var layout = new UnionLayoutGcc();
-                        var ret = layout.Run(Members);
+                        var layout = new UnionLayoutPcc();
+                        var ret = layout.Run(Members, AlignSize);
                         _size = ret.Item1;
-                        _align = ret.Item2;
+                        AlignSize = ret.Item2;
                     }
 
                 }
@@ -779,7 +910,7 @@ namespace AnsiCParser {
                 /// </summary>
                 /// <returns></returns>
                 public override int AlignOf() {
-                    return _align;
+                    return AlignSize;
                 }
 
                 /// <summary>
@@ -815,7 +946,9 @@ namespace AnsiCParser {
             /// </summary>
             /// <remarks>
             ///  - 列挙型は，char，符号付き整数型又は符号無し整数型と適合する型とする。型の選択は，処理系定義とする。
-            /// （つまり、sizeof(列挙型) は 処理系定義の値になる。）
+            ///    しかし，その型は列挙型のすべてのメンバの値を表現できなければならない。列挙子の宣言の並びを終了するまでは列挙型は不完全型とする。
+            ///    (処理系はすべての列挙定数が指定された後で整数型の選択を行うことができる。)
+            /// （つまりsizeof(列挙型) は 処理系定義の値になる。また、char型なので符号の有無は処理系定義である。）
             /// </remarks>
             public class EnumType : TaggedType {
                 public EnumType(string tagName, bool isAnonymous) : base(tagName, isAnonymous) {
@@ -826,6 +959,7 @@ namespace AnsiCParser {
                     var ret = new EnumType(TagName, IsAnonymous) {
                         Members = Members.Select<MemberInfo, MemberInfo>(x => x.Duplicate()).ToList()
                     };
+                    ret.SelectedType = SelectedType.Duplicate() as BasicType;
                     return ret;
                 }
 
@@ -834,6 +968,14 @@ namespace AnsiCParser {
                 }
 
                 public override void Fixup(CType type) {
+                }
+
+                public BasicType SelectedType {
+                    get; private set;
+                }
+
+                public void UpdateSelectedType() {
+                    SelectedType = Members.Any(x => x.Value < 0) ? CreateSignedInt() : CreateUnsignedInt();
                 }
 
                 /// <summary>
@@ -859,6 +1001,7 @@ namespace AnsiCParser {
                 /// 6.4.4.3 列挙定数
                 /// 意味規則
                 /// 列挙定数として宣言された識別子は，型 int をもつ。
+                /// ※ただし、列挙型の型は処理系定義となるため、int型とは限らない。(6.7.2.2 列挙型指定子の意味規則第２パラグラフより)
                 /// </remarks>
                 public class MemberInfo {
                     public MemberInfo(EnumType parentType, Token ident, int value) {

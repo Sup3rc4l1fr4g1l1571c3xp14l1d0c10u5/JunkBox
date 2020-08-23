@@ -90,9 +90,12 @@ namespace AnsiCParser.SyntaxTree {
         public static TResult Accept<TResult, TArg>(this Expression.PrimaryExpression.Constant.IntegerConstant self, IVisitor<TResult, TArg> visitor, TArg value) {
             return visitor.OnIntegerConstant(self, value);
         }
-        public static TResult Accept<TResult, TArg>(this Expression.PrimaryExpression.EnclosedInParenthesesExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
-            return visitor.OnEnclosedInParenthesesExpression(self, value);
+        public static TResult Accept<TResult, TArg>(this Expression.PrimaryExpression.CompoundLiteralExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnCompoundLiteralExpression(self, value);
         }
+        //public static TResult Accept<TResult, TArg>(this Expression.PrimaryExpression.EnclosedInParenthesesExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+        //    return visitor.OnEnclosedInParenthesesExpression(self, value);
+        //}
         public static TResult Accept<TResult, TArg>(this Expression.PrimaryExpression.AddressConstantExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
             return visitor.OnAddressConstantExpression(self, value);
         }
@@ -125,6 +128,9 @@ namespace AnsiCParser.SyntaxTree {
         }
         public static TResult Accept<TResult, TArg>(this Expression.SizeofTypeExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
             return visitor.OnSizeofTypeExpression(self, value);
+        }
+        public static TResult Accept<TResult, TArg>(this Expression.AlignofExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
+            return visitor.OnAlignofExpression(self, value);
         }
         public static TResult Accept<TResult, TArg>(this Expression.TypeConversionExpression self, IVisitor<TResult, TArg> visitor, TArg value) {
             return visitor.OnTypeConversionExpression(self, value);

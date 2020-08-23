@@ -9,10 +9,10 @@ namespace AnsiCParser {
             /// 配列型を作成
             /// </summary>
             /// <param name="length">配列長(-1は不定長)</param>
-            /// <param name="type">要素型</param>
-            public ArrayType(int length, CType type) {
+            /// <param name="elementType">要素型</param>
+            public ArrayType(int length, CType elementType) {
                 Length = length;
-                ElementType = type;
+                ElementType = elementType;
             }
 
             /// <summary>

@@ -34,6 +34,7 @@ namespace AnsiCParser {
                     return new {
                         Class ="EnumType",
                         TagName = self.TagName,
+                        SelectedType = self.SelectedType.Accept(this,null),
                         Members = self.Members.Select(x => { return new { Ident = x.Ident?.Raw ?? "", Value = x.Value }; }).ToArray()
                     };
                 }

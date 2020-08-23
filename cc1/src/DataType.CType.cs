@@ -69,7 +69,7 @@ namespace AnsiCParser {
             public static bool IsEqual(CType t1, CType t2) {
                 for (;;) {
 
-                    /* 同一なので真 */
+                    /* 参照が同一なので真 */
                     if (ReferenceEquals(t1, t2)) { return true; }
 
                     /* typedef型の場合は実際の型を取りだして再チェック */
@@ -472,7 +472,7 @@ namespace AnsiCParser {
                 public int Align { get; }
 
             }
-
+#if false
             public static readonly List<TypeInfo> TypeInfoEntry;
 
             public static readonly Dictionary<BasicType.TypeKind, TypeInfo> TypeInfoTable;
@@ -510,7 +510,7 @@ namespace AnsiCParser {
                 // charはSingedCharにする
                 TypeInfoTable[BasicType.TypeKind.Char] = TypeInfoTable[BasicType.TypeKind.SignedChar];
             }
-
+#endif
 
             /// <summary>
             /// 基本型のサイズ取得
@@ -608,7 +608,7 @@ namespace AnsiCParser {
                     case BasicType.TypeKind.Double:
                         return 8;
                     case BasicType.TypeKind.LongDouble:
-                        return 8;
+                        return 4;
                     case BasicType.TypeKind._Bool:
                         return 1;
                     case BasicType.TypeKind.Float_Complex:
@@ -616,7 +616,7 @@ namespace AnsiCParser {
                     case BasicType.TypeKind.Double_Complex:
                         return 8;
                     case BasicType.TypeKind.LongDouble_Complex:
-                        return 8;
+                        return 4;
                     case BasicType.TypeKind.Float_Imaginary:
                         return 4;
                     case BasicType.TypeKind.Double_Imaginary:
@@ -696,7 +696,13 @@ namespace AnsiCParser {
                 if ((t1.IsStructureType() && t2.IsStructureType()) || (t1.IsUnionType() && t2.IsUnionType())) {
                     var ta1 = t1 as TaggedType.StructUnionType;
                     var ta2 = t2 as TaggedType.StructUnionType;
-                    if (ta1.Kind != ta1.Kind) {
+                    if (ta1.Kind != ta2.Kind) {
+                        return null;
+                    }
+                    if (ta1.PackSize != ta2.PackSize) {
+                        return null;
+                    }
+                    if (ta1.AlignSize != ta2.AlignSize) {
                         return null;
                     }
 
@@ -716,7 +722,7 @@ namespace AnsiCParser {
                         return null;
                     }
 
-                    var newType = new TaggedType.StructUnionType(ta1.Kind, ta1.TagName, ta1.IsAnonymous);
+                    var newType = new TaggedType.StructUnionType(ta1.Kind, ta1.TagName, ta1.IsAnonymous, ta1.PackSize, ta1.AlignSize);
                     var newMembers = new List<TaggedType.StructUnionType.MemberInfo>();
                     for (var i = 0; i < ta1.Members.Count; i++) {
                         if (ta1.Members[i].Ident.Raw != ta2.Members[i].Ident.Raw) {
@@ -930,6 +936,14 @@ namespace AnsiCParser {
                 return false;
             }
 
+            public BasicType GetBasicType() {
+                var unwrappedSelf = Unwrap();
+                if (unwrappedSelf is BasicType) {
+                    return (unwrappedSelf as BasicType);
+                } else {
+                    throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "基本型ではない型から基本型を取得しようとしました。（本実装の誤りだと思います。）");
+                }
+            }
         }
     }
 

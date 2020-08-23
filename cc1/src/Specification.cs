@@ -586,7 +586,7 @@ namespace AnsiCParser {
             if (unwrappedSelf.IsIntegerType()) {
                 if (unwrappedSelf.IsEnumeratedType()) {
                     // すべての列挙型は，それぞれと適合する整数型と同じ順位をもたなければならない（6.7.2.2 参照）。
-                    return -5;  // == signed int
+                    return -5;  // == signed int / unsigned int
                 } else {
                     switch ((unwrappedSelf as BasicType)?.Kind) {
                         case BasicType.TypeKind.SignedLongLongInt:
@@ -660,6 +660,10 @@ namespace AnsiCParser {
             } else {
                 var bft = ty as BitFieldType;
                 // ビットフィールドである
+                if (bft.Type.Unwrap().IsEnumeratedType()) {
+                    // 無条件でint型に変換できる
+                    return new Expression.IntegerPromotionExpression(expr.LocationRange, ((bft.Type.Unwrap() as TaggedType.EnumType).SelectedType), expr);
+                }
                 switch ((bft.Type.Unwrap() as BasicType)?.Kind) {
                     // _Bool 型，int 型，signed int 型，又は unsigned int 型
                     case BasicType.TypeKind._Bool:
@@ -675,7 +679,8 @@ namespace AnsiCParser {
                     case BasicType.TypeKind.UnsignedShortInt:  // 無条件でint型に変換できる
                     case BasicType.TypeKind.UnsignedInt:
                     case BasicType.TypeKind.UnsignedLongInt: // sizeof(uint) == sizeof(ulong)に限り変換できる
-                        // int 型で表現可能な場合，その値を int 型に変換する。そうでない場合，unsigned int 型に変換する
+                        // 元の型のすべての値を int 型で表現可能な場合，その値を int 型に変換する。そうでない場合，unsigned int 型に変換する
+                        // -> 元の型が unsigned int の場合のみ unsigned int 型に拡張。それ以外の場合は int型に拡張
                         if (bft.BitWidth == 4 * 8) {
                             // unsigned int でないと表現できない
                             return new Expression.IntegerPromotionExpression(expr.LocationRange, CType.CreateUnsignedInt(), expr);
@@ -684,9 +689,24 @@ namespace AnsiCParser {
                             return new Expression.IntegerPromotionExpression(expr.LocationRange, CType.CreateSignedInt(), expr);
                         }
                     case BasicType.TypeKind.SignedLongLongInt:
-                        return new Expression.IntegerPromotionExpression(expr.LocationRange, CType.CreateSignedLongLongInt(), expr);
+                        // 元の型のすべての値を int 型で表現可能な場合，その値を int 型に変換する。そうでない場合，unsigned int 型に変換する
+                        // -> 元の型が unsigned int の場合のみ unsigned int 型に拡張。それ以外の場合は int型に拡張
+                        if (bft.BitWidth > 4 * 8) {
+                            // signed long long でないと表現できない
+                            return new Expression.IntegerPromotionExpression(expr.LocationRange, CType.CreateSignedLongLongInt(), expr);
+                        } else {
+                            // signed int で表現できる
+                            return new Expression.IntegerPromotionExpression(expr.LocationRange, CType.CreateSignedInt(), expr);
+                        }
                     case BasicType.TypeKind.UnsignedLongLongInt:
-                        return new Expression.IntegerPromotionExpression(expr.LocationRange, CType.CreateUnsignedLongLongInt(), expr);
+                        // unsigned int 型で表現可能な場合，その値を unsigned int 型に変換する。そうでない場合，unsigned long long 型に変換する
+                        if (bft.BitWidth > 4 * 8) {
+                            // unsigned long long でないと表現できない
+                            return new Expression.IntegerPromotionExpression(expr.LocationRange, CType.CreateUnsignedLongLongInt(), expr);
+                        } else {
+                            // unsigned int で表現できる
+                            return new Expression.IntegerPromotionExpression(expr.LocationRange, CType.CreateUnsignedInt(), expr);
+                        }
                     default:
                         throw new CompilerException.SpecificationErrorException(expr.LocationRange, $"ビットフィールドの型は，修飾版又は非修飾版の_Bool，signed int，unsigned int 又は他の処理系定義の型でなければならない。");
                 }
@@ -759,8 +779,8 @@ namespace AnsiCParser {
             var tyLhs = lhs.Type.Unwrap();
             var tyRhs = rhs.Type.Unwrap();
 
-            var btLhs = tyLhs.IsEnumeratedType() ? BasicType.CreateSignedInt() : tyLhs as BasicType;
-            var btRhs = tyRhs.IsEnumeratedType() ? BasicType.CreateSignedInt() : tyRhs as BasicType;
+            var btLhs = tyLhs.IsEnumeratedType() ? ((tyLhs.Unwrap() as TaggedType.EnumType).SelectedType) : tyLhs as BasicType;
+            var btRhs = tyRhs.IsEnumeratedType() ? ((tyRhs.Unwrap() as TaggedType.EnumType).SelectedType) : tyRhs as BasicType;
 
             if (btLhs == null || btRhs == null) {
                 throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "二つのオペランドの一方に基本型以外が与えられた。（本実装の誤りが原因だと思われます。）");
@@ -921,8 +941,8 @@ namespace AnsiCParser {
             tyLhs = lhs.Type.Unwrap();
             tyRhs = rhs.Type.Unwrap();
 
-            btLhs = tyLhs.IsEnumeratedType() ? BasicType.CreateSignedInt() : tyLhs as BasicType;
-            btRhs = tyRhs.IsEnumeratedType() ? BasicType.CreateSignedInt() : tyRhs as BasicType;
+            btLhs = tyLhs.IsEnumeratedType() ? ((tyLhs.Unwrap() as TaggedType.EnumType).SelectedType) : tyLhs as BasicType;
+            btRhs = tyRhs.IsEnumeratedType() ? ((tyRhs.Unwrap() as TaggedType.EnumType).SelectedType) : tyRhs as BasicType;
 
             if (btLhs == null || btRhs == null) {
                 throw new CompilerException.InternalErrorException(Location.Empty, Location.Empty, "整数拡張後のオペランドの型が基本型以外になっています。（本実装の誤りが原因だと思われます。）");
@@ -1349,10 +1369,10 @@ namespace AnsiCParser {
                         expr = (expr as Expression.TypeConversionExpression).Expr;
                         continue;
                     }
-                    if (expr is Expression.PrimaryExpression.EnclosedInParenthesesExpression) {
-                        expr = (expr as Expression.PrimaryExpression.EnclosedInParenthesesExpression).ParenthesesExpression;
-                        continue;
-                    }
+                    //if (expr is Expression.PrimaryExpression.EnclosedInParenthesesExpression) {
+                    //    expr = (expr as Expression.PrimaryExpression.EnclosedInParenthesesExpression).ParenthesesExpression;
+                    //    continue;
+                    //}
                     break;
                 }
             }

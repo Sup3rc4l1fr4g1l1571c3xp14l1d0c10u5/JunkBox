@@ -124,7 +124,11 @@ namespace AnsiCParser.SyntaxTree {
         }
 
         public object OnComplexInitializer(Initializer.ComplexInitializer self, object value) {
-            throw new NotImplementedException("来ないはず");
+            return new {
+                Class = "ComplexInitializer",
+                LocationRange = LocationRangeToJson(self.LocationRange),
+                Ret = self.Ret.Select(x => x.Accept(this, value)).ToArray()
+            };
         }
 
         public object OnCompoundAssignmentExpression(Expression.AssignmentExpression.CompoundAssignmentExpression self, object value) {
@@ -201,14 +205,14 @@ namespace AnsiCParser.SyntaxTree {
             };
         }
 
-        public object OnEnclosedInParenthesesExpression(Expression.PrimaryExpression.EnclosedInParenthesesExpression self, object value) {
-            return new {
-                Class = "EnclosedInParenthesesExpression",
-                LocationRange = LocationRangeToJson(self.LocationRange),
-                Type = self.Type.Accept(new DataType.ToJsonVisitor(), null),
-                ParenthesesExpression = self.ParenthesesExpression.Accept(this, value),
-            };
-        }
+        //public object OnEnclosedInParenthesesExpression(Expression.PrimaryExpression.EnclosedInParenthesesExpression self, object value) {
+        //    return new {
+        //        Class = "EnclosedInParenthesesExpression",
+        //        LocationRange = LocationRangeToJson(self.LocationRange),
+        //        Type = self.Type.Accept(new DataType.ToJsonVisitor(), null),
+        //        ParenthesesExpression = self.ParenthesesExpression.Accept(this, value),
+        //    };
+        //}
 
         public object OnAddressConstantExpression(Expression.PrimaryExpression.AddressConstantExpression self, object value) {
             return new {
@@ -369,6 +373,20 @@ namespace AnsiCParser.SyntaxTree {
             };
         }
 
+        public object OnCompoundLiteralExpression(Expression.PrimaryExpression.CompoundLiteralExpression self, object value) {
+            return new {
+                Class = "CompoundLiteralExpression",
+                LocationRange = LocationRangeToJson(self.LocationRange),
+                Type = self.Type.Accept(new DataType.ToJsonVisitor(), null),
+                InitializeCommands = self.InitializeCommands.Select(x => {
+                    var path = x.path.Select(y => { return (object)new { Type = y.ParentType.Accept(new DataType.ToJsonVisitor(), null), Index = y.Index }; }).ToArray();
+                    var expr = x.expr.Accept(this, value);
+                    return (object)new { Path = path, Expr = expr };
+                }).ToArray()
+            };
+        }
+        
+
         public object OnIntegerPromotionExpression(Expression.IntegerPromotionExpression self, object value) {
             return new {
                 Class = "IntegerPromotionExpression",
@@ -479,7 +497,11 @@ namespace AnsiCParser.SyntaxTree {
         }
 
         public object OnSimpleInitializer(Initializer.SimpleInitializer self, object value) {
-            throw new NotImplementedException("来ないはず");
+            return new {
+                Class = "SimpleInitializer",
+                LocationRange = LocationRangeToJson(self.LocationRange),
+                Expr = self.AssignmentExpression?.Accept(this, value),
+            };
         }
 
         public object OnSizeofExpression(Expression.SizeofExpression self, object value) {
@@ -700,11 +722,21 @@ namespace AnsiCParser.SyntaxTree {
             return new {
                 Class = "ConcreteInitializer",
                 LocationRange = LocationRangeToJson(self.LocationRange),
+                OriginalInitializer = self.OriginalInitializer.Accept(this,value),
                 InitializeCommands = self.InitializeCommands.Select(x => {
                     var path = x.path.Select(y => { return (object)new { Type = y.ParentType.Accept(new DataType.ToJsonVisitor(), null), Index = y.Index }; }).ToArray();
                     var expr = x.expr.Accept(this, value);
                     return (object)new { Path = path, Expr = expr };
                 }).ToArray()
+            };
+        }
+
+        public object OnAlignofExpression(Expression.AlignofExpression self, object value) {
+            return new {
+                Class = "AlignofExpression",
+                LocationRange = LocationRangeToJson(self.LocationRange),
+                Type = self.Type.Accept(new DataType.ToJsonVisitor(), null),
+                TypeOperand = self.TypeOperand.Accept(new DataType.ToJsonVisitor(), null),
             };
         }
     }

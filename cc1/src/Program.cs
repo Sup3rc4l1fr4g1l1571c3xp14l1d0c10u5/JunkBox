@@ -3,6 +3,8 @@ using System.Linq;
 using System.Diagnostics;
 using AnsiCParser.SyntaxTree;
 using Codeplex.Data;
+using System.Collections.Generic;
+using System.Collections;
 
 namespace AnsiCParser {
     class Program {
@@ -131,74 +133,36 @@ namespace AnsiCParser {
         }
 
         static void DebugMain(string[] args) {
+            BitBuffer.Test();
             var ret = new Parser(
-                System.IO.File.ReadAllText(@"C:\Users\whelp\Desktop\cc1\TestCase\array-initializer_00001.c") /*
+                System.IO.File.ReadAllText(@"C:\Users\whelp\Desktop\cc1\TestCase\tcc\tmp\95_bitfields.i") /*
                 @"
-int x =1;
+typedef long unsigned int size_t;
 
-struct {
+int printf (const char*, ...);
+void *memset (void*, int, size_t);
+
+
+void dump(void *p, int s)
+{
     int i;
-    int f;
-    int a[2];
-} s1 = {
-    .f=3,
-    .i=2,
-    .a[1]=9
-};
+    for (i = s; --i >= 0;)
+        printf(""%02X"", ((unsigned char*)p)[i]);
+    printf(""\n"");
+}
 
-struct {
-    int i;
-    int f;
-    struct { int x; int y; } a[2];
-} s2 = {
-    .f=3,
-    .i=2,
-    .a[1]=9,10
-};
+#pragma pack(1)
 
-struct {
-    int x;
-    int y;
-} a1[3] = {1, 2, 3, 4, 5, 6};
+int top = 1;
 
-struct {
-    int x;
-    int y;
-} a2[3] = {
-    {1, 2},
-    {3, 4},
-    5, 6
-};
+int main(void) {
 
-struct {
-  int x;
-  int y;
-} a3[3] = {
-  [2].y=6, [2].x=5,
-  [1].y=4, [1].x=3,
-  [0].y=2, [0].x=1
-};
-
-struct { int a[3]; int b; } w1[] = { 
-    [0].a = {1}, 
-    [1].a[0] = 2 
-};
-
-struct { int a[3]; int b; } w2[] = {
-   { { 1, 0, 0 }, 0 },
-   { { 2, 0, 0 }, 0 } 
-};
-
-int x1 = 1;
-int x2 = {1};
-int x3 = {1,2,3};
-int x4 = {{1},2,3};
-
-int y1[] = {1};
-int y2[] = {1,2,3};
-int y3[] = {{1},2,3};
-
-int b[100] = {  [98]=98,99,[10] = 10,11,12, [0] = 0,1,2,};
+    struct __s
+    {
+        unsigned x:5, y:5, :0, z:5; char a:5; short b:5;
+    };
+    return 0;
+}
 
 
 "//*/
@@ -206,13 +170,108 @@ int b[100] = {  [98]=98,99,[10] = 10,11,12, [0] = 0,1,2,};
             using (var o = new System.IO.StreamWriter("debug.ast")) {
                 o.WriteLine(DynamicJson.Serialize(ret.Accept(new ToJsonVisitor(), null)));
             }
-            using (var o = new System.IO.StreamWriter("debug.s")) {
+            using (  var o = new System.IO.StreamWriter("debug.s")) {
                 var compiler = new Compiler();
                 compiler.Compile(ret, o);
             }
             return;
         }
     }
+
+    public class BitBuffer : IEnumerable<Byte> {
+        private readonly List<byte> bytes;
+        public Byte this[int n] { get { return bytes[n]; } }
+        public int Count { get { return bytes.Count; } }
+        public BitBuffer() {
+            this.bytes = new List<Byte>();
+        }
+        public void Write(UInt64 value, int offset, int width) {
+            Console.WriteLine($"buf.Write({value:X8},{offset},{width});");
+            var bytePos = offset / 8;
+            var bitPos = offset % 8;
+
+            var needLen = (offset + width + 7) / 8;
+            if (this.bytes.Count < needLen) {
+                this.bytes.AddRange(Enumerable.Repeat((byte)0, needLen - this.bytes.Count));
+            }
+
+            if (bitPos != 0) {
+                var writeWidth = 8 - bitPos;
+                if (width < writeWidth) {
+                    writeWidth = width;
+                }
+                var srcmask = (byte)((1U << writeWidth) - 1);
+                var dstmask = (byte)(~(srcmask << bitPos));
+
+                var dstValue = (byte)(this.bytes[bytePos] & dstmask);
+                var srcValue = (byte)((byte)value & srcmask);
+
+                var margedValue = (byte)(dstValue | (srcValue << bitPos));
+                this.bytes[bytePos] = margedValue;
+                bytePos++;
+                width -= writeWidth;
+                value >>= writeWidth;
+                bitPos = 0;
+            }
+            while (width >= 8) {
+                this.bytes[bytePos] = (byte)(value & 0xFF);
+                bytePos++;
+                width -= 8;
+                value >>= 8;
+            }
+            if (width > 0) {
+                var mask = (byte)((1U << width) - 1);
+                this.bytes[bytePos] = (byte)((this.bytes[bytePos] & (byte)~mask) | ((byte)value & mask));
+            }
+        }
+
+        public IEnumerator<byte> GetEnumerator() {
+            foreach (var v in this.bytes) {
+                yield return v;
+            }
+        }
+
+        IEnumerator IEnumerable.GetEnumerator() {
+            return this.GetEnumerator();
+        }
+
+        internal static void Test() {
+            {
+                BitBuffer buf1 = new BitBuffer();
+                buf1.Write(0xFFFFFFFFFFFFFFFF, 0, 12);
+                buf1.Write(0x000000FF, 12, 6);
+                buf1.Write(0xFFFFFFFFFFFFFFFF, 18, 63);
+                buf1.Write(0x000000FF, 81, 4);
+                buf1.Write(0xFFFFFFFFFFFFFFFF, 85, 2);
+
+                BitBuffer buf2 = new BitBuffer();
+                buf2.Write(0xFFFFFFFFFFFFFFFF, 85, 2);
+                buf2.Write(0x000000FF, 81, 4);
+                buf2.Write(0xFFFFFFFFFFFFFFFF, 18, 63);
+                buf2.Write(0x000000FF, 12, 6);
+                buf2.Write(0xFFFFFFFFFFFFFFFF, 0, 12);
+
+                System.Diagnostics.Debug.Assert(buf1.SequenceEqual(buf2));
+            }
+            {
+
+                BitBuffer buf1 = new BitBuffer();
+                buf1.Write(0xFFFFFFFFFFFFFFFF, 0, 12);
+                buf1.Write(0x000000FF, 12, 6);
+                buf1.Write(0xFFFFFFFFFFFFFFFF, 18, 63);
+                buf1.Write(0x000000FF, 81, 4);
+                buf1.Write(0xFFFFFFFFFFFFFFFF, 85, 2);
+
+                BitBuffer buf2 = new BitBuffer();
+                buf2.Write(0xFFFFFFFFFFFFFFFF, 85, 2);
+                buf2.Write(0x000000FF, 81, 4);
+                buf2.Write(0xFFFFFFFFFFFFFFFF, 18, 63);
+                buf2.Write(0x000000FF, 12, 6);
+                buf2.Write(0xFFFFFFFFFFFFFFFF, 0, 12);
+            }
+        }
+    }
+
 }
 
 

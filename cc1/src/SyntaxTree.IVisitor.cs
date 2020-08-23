@@ -28,7 +28,8 @@ namespace AnsiCParser.SyntaxTree {
         TResult OnCharacterConstant(Expression.PrimaryExpression.Constant.CharacterConstant self, TArg value);
         TResult OnFloatingConstant(Expression.PrimaryExpression.Constant.FloatingConstant self, TArg value);
         TResult OnIntegerConstant(Expression.PrimaryExpression.Constant.IntegerConstant self, TArg value);
-        TResult OnEnclosedInParenthesesExpression(Expression.PrimaryExpression.EnclosedInParenthesesExpression self, TArg value);
+        TResult OnCompoundLiteralExpression(Expression.PrimaryExpression.CompoundLiteralExpression self, TArg value);
+        //TResult OnEnclosedInParenthesesExpression(Expression.PrimaryExpression.EnclosedInParenthesesExpression self, TArg value);
         TResult OnAddressConstantExpression(Expression.PrimaryExpression.AddressConstantExpression self, TArg value);
         TResult OnEnumerationConstant(Expression.PrimaryExpression.IdentifierExpression.EnumerationConstant self, TArg value);
         TResult OnFunctionExpression(Expression.PrimaryExpression.IdentifierExpression.FunctionExpression self, TArg value);
@@ -40,6 +41,7 @@ namespace AnsiCParser.SyntaxTree {
         TResult OnShiftExpression(Expression.ShiftExpression self, TArg value);
         TResult OnSizeofExpression(Expression.SizeofExpression self, TArg value);
         TResult OnSizeofTypeExpression(Expression.SizeofTypeExpression self, TArg value);
+        TResult OnAlignofExpression(Expression.AlignofExpression self, TArg value);
         TResult OnTypeConversionExpression(Expression.TypeConversionExpression self, TArg value);
         TResult OnUnaryAddressExpression(Expression.UnaryAddressExpression self, TArg value);
         TResult OnUnaryMinusExpression(Expression.UnaryMinusExpression self, TArg value);
