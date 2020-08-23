@@ -64,13 +64,12 @@
     <Compile Include="src\DataType.TypeQualifierType.cs" />
     <Compile Include="src\DataType.VisitorExt.cs" />
     <Compile Include="src\DynamicJson.cs" />
-    <Compile Include="src\Ext.cs" />
     <Compile Include="src\FunctionSpecifier.cs" />
     <Compile Include="src\LabelScopeValue.cs" />
     <Compile Include="src\Lexer.cs" />
-    <Compile Include="src\LinkageKind.cs" />
-    <Compile Include="src\LinkageObject.cs" />
-    <Compile Include="src\LinkageObjectTable.cs" />
+    <Compile Include="src\Linkage.Kind.cs" />
+    <Compile Include="src\Linkage.Object.cs" />
+    <Compile Include="src\Linkage.Table.cs" />
     <Compile Include="src\Location.cs" />
     <Compile Include="src\LocationRange.cs" />
     <Compile Include="src\Logger.cs" />
