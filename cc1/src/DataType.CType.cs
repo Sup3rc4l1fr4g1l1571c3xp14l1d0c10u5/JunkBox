@@ -247,6 +247,9 @@ namespace AnsiCParser {
             public static BasicType CreateUnsignedShortInt() {
                 return BasicType.Create(BasicType.TypeKind.UnsignedShortInt);
             }
+            public static BasicType CreateSignedShortInt() {
+                return BasicType.Create(BasicType.TypeKind.SignedShortInt);
+            }
 
             public static BasicType CreateKAndRImplicitInt() {
                 return BasicType.Create(BasicType.TypeKind.__KAndRImplicitInt);
@@ -308,6 +311,17 @@ namespace AnsiCParser {
             public static BasicType CreatePtrDiffT() {
                 return BasicType.Create(BasicType.TypeKind.SignedLongInt);
             }
+
+            // 処理系実装上用意した型
+
+            public static BasicType CreateMultiByteChar() {
+                return BasicType.Create(BasicType.TypeKind.Char);
+            }
+
+            public static BasicType CreateWideChar() {
+                return BasicType.Create(BasicType.TypeKind.SignedInt);
+            }
+
 
             /// <summary>
             /// 型修飾を得る
@@ -705,6 +719,9 @@ namespace AnsiCParser {
                     if (ta1.AlignSize != ta2.AlignSize) {
                         return null;
                     }
+                    if (ta1.LayoutMode != ta2.LayoutMode) {
+                        return null;
+                    }
 
                     if (ta1.TagName != ta2.TagName) {
                         return null;
@@ -722,7 +739,7 @@ namespace AnsiCParser {
                         return null;
                     }
 
-                    var newType = new TaggedType.StructUnionType(ta1.Kind, ta1.TagName, ta1.IsAnonymous, ta1.PackSize, ta1.AlignSize);
+                    var newType = new TaggedType.StructUnionType(ta1.Kind, ta1.TagName, ta1.IsAnonymous, ta1.PackSize, ta1.AlignSize,ta1.LayoutMode);
                     var newMembers = new List<TaggedType.StructUnionType.MemberInfo>();
                     for (var i = 0; i < ta1.Members.Count; i++) {
                         if (ta1.Members[i].Ident.Raw != ta2.Members[i].Ident.Raw) {

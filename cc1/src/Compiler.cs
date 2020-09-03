@@ -5204,7 +5204,7 @@ namespace AnsiCParser {
             public Value OnStringExpression(Expression.PrimaryExpression.StringExpression self, Value value) {
                 //int no = _context.DataBlock.Count;
                 //var label = $"D{no}";
-                _context.DataBlock.Add(Tuple.Create(self.Label, self.Value.ToArray()));
+                _context.DataBlock.Add(Tuple.Create(self.Label, self.GetBytes()));
                 _context.Push(new Value { Kind = Value.ValueKind.Ref, Type = self.Type, Offset = 0, Label = self.Label });
                 return value;
             }
@@ -6103,7 +6103,7 @@ namespace AnsiCParser {
                     if (_context.DataBlock.Any(x => x.Item1 == f.Ident) == false) {
                         if (f.Obj is Expression.PrimaryExpression.StringExpression) {
                             var se = f.Obj as Expression.PrimaryExpression.StringExpression;
-                            _context.DataBlock.Add(Tuple.Create(se.Label, se.Value.ToArray()));
+                            _context.DataBlock.Add(Tuple.Create(se.Label, se.GetBytes()));
                         } else {
                             throw new Exception("");
                         }
@@ -6140,7 +6140,7 @@ namespace AnsiCParser {
             public Value OnStringExpression(Expression.PrimaryExpression.StringExpression self, Value value) {
                 //int no = _context.DataBlock.Count;
                 //var label = $"D{no}";
-                _context.DataBlock.Add(Tuple.Create(self.Label, self.Value.ToArray()));
+                _context.DataBlock.Add(Tuple.Create(self.Label, self.GetBytes()));
                 return new Value { Kind = Value.ValueKind.Ref, Label = self.Label, Offset = 0, Type = self.Type };
             }
 

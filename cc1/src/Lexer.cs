@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace AnsiCParser {
@@ -713,10 +714,11 @@ namespace AnsiCParser {
         /// <summary>
         /// 文字定数の解析
         /// </summary>
-        /// <param name="peek"></param>
-        /// <param name="next"></param>
-        /// <param name="write"></param>
-        public static void CharIterator(Location loc, Func<int> peek, Action next, Action<byte> write) {
+        /// <param name="peek">現在位置の文字を読み取り</param>
+        /// <param name="next">読み取り位置を１文字進める</param>
+        /// <param name="write">バッファに対して書き込みを行う</param>
+        /// <param name="convert">文字コードを変換する</param>
+        public static void CharIterator(Location loc, Func<int> peek, Action next, Action<byte[]> write, Func<int, byte[]> convert) {
             int ret = 0;
             if (peek() == '\\') {
                 next();
@@ -725,61 +727,67 @@ namespace AnsiCParser {
                     case '"':
                     case '?':
                     case '\\':
-                        write((byte)peek());
+                        write(convert(peek()));
                         next();
                         return;
                     case 'a':
                         next();
-                        write((byte)'\a');
+                        write(convert('\a'));
                         return;
                     case 'b':
                         next();
-                        write((byte)'\b');
+                        write(convert('\b'));
                         return;
                     case 'e':
                         next();
-                        write((byte)0x1B);
+                        write(convert(0x1b));
                         return;
                     case 'f':
                         next();
-                        write((byte)'\f');
+                        write(convert('\f'));
                         return;
                     case 'n':
                         next();
-                        write((byte)'\n');
+                        write(convert('\n'));
                         return;
                     case 'r':
                         next();
-                        write((byte)'\r');
+                        write(convert('\r'));
                         return;
                     case 't':
                         next();
-                        write((byte)'\t');
+                        write(convert('\t'));
                         return;
                     case 'v':
                         next();
-                        write((byte)'\v');
+                        write(convert('\v'));
                         return;
                     case 'x': {
                             next();
                             int n = 0;
+                            List<byte> buffer = new List<byte>();
                             while (IsXDigit(peek())) {
                                 ret = (ret << 4) | XDigitToInt(peek());
                                 next();
                                 n++;
                                 if (n == 2) {
-                                    write((byte)ret);
+                                    buffer.Add((byte)ret);
                                     n = 0;
                                     ret = 0;
                                 }
                             }
                             if (n != 0) {
-                                write((byte)ret);
+                                buffer.Add((byte)ret);
                             }
+
+                            write(buffer.ToArray());
+
                             return;
                         }
-                    case 'u':
+                    case 'u': {
                         next();
+                        List<byte> buffer = new List<byte>();
+
                         for (var i = 0; i < 4; i++) {
                             if (IsXDigit(peek()) == false) {
                                 throw new CompilerException.SyntaxErrorException(loc, loc, "不正なユニコード文字がありました。");
@@ -787,13 +795,16 @@ namespace AnsiCParser {
                             ret = (ret << 4) | XDigitToInt(peek());
                             next();
                             if ((i % 2) == 1) {
-                                write((byte)ret);
+                                buffer.Add((byte)ret);
                                 ret = 0;
                             }
                         }
+                        write(buffer.ToArray());
                         return;
-                    case 'U':
+                    }
+                    case 'U': {
                         next();
+                        List<byte> buffer = new List<byte>();
                         for (var i = 0; i < 8; i++) {
                             if (IsXDigit(peek()) == false) {
                                 throw new CompilerException.SyntaxErrorException(loc, loc, "不正なユニコード文字がありました。");
@@ -801,11 +812,14 @@ namespace AnsiCParser {
                             ret = (ret << 4) | XDigitToInt(peek());
                             next();
                             if ((i % 2) == 1) {
-                                write((byte)ret);
+                                buffer.Add((byte)ret);
                                 ret = 0;
                             }
                         }
+                        write(buffer.ToArray());
                         return;
+
+                    }
                     case '0':
                     case '1':
                     case '2':
@@ -821,11 +835,11 @@ namespace AnsiCParser {
                             ret = (ret << 3) | (peek() - '0');
                             next();
                         }
-                        write((byte)ret);
+                        write(new[] { (byte)ret });
                         return;
                     default:
                         Logger.Warning(loc, loc, $"不正なエスケープシーケンス '\\{(char)peek()}' がありました。エスケープ文字を無視し、'{(char)peek()}' として読み取ります。");
-                        write((byte)peek());
+                        write(convert(ret));
                         next();
                         return;
 
@@ -833,10 +847,7 @@ namespace AnsiCParser {
             } else {
                 char ch = (char)peek();
                 next();
-                var bytes = System.Text.Encoding.UTF8.GetBytes(new[] { ch });
-                foreach (var b in bytes) {
-                    write(b);
-                }
+                write(convert(ch));
                 return;
             }
         }
@@ -1335,11 +1346,11 @@ namespace AnsiCParser {
                                 if (quote && scanner.Read(new Regex(@"\s*,\s*(?<packsize>\d+)\s*"), out m)) {
                                     pack = int.Parse(m.Groups["packsize"].Value);
                                 } else {
-                                    pack = 0;
+                                    //pack = 0;
                                 }
                             } else if (scanner.Read(new Regex(@"\s*pop\s*"))) {
                                 op = "pop";
-                                pack = 0;
+                                //pack = 0;
                             } else if (scanner.Read(new Regex(@"\s*(?<packsize>\d+)\s*"), out m)) {
                                 pack = int.Parse(m.Groups["packsize"].Value);
                             } else {
@@ -1355,7 +1366,23 @@ namespace AnsiCParser {
                             if (scanner.IsEoS() == false) {
                                 Logger.Warning(start.Item1, end.Item1, "解釈できない書式の指令です。pragma全体を読み飛ばします。");
                             } else {
-                                Settings.PackSize = pack;
+                                switch (op) {
+                                    case "": 
+                                        Settings.PackSize = pack; 
+                                        break;
+                                    case "push":
+                                        Settings.PackSizeStack.Push(Settings.PackSize);
+                                        if (pack != -1) { Settings.PackSize = pack; }
+                                        break;
+                                    case "pop":
+                                        if (Settings.PackSizeStack.Any() == false) {
+                                            Logger.Warning(start.Item1, end.Item1, "#pragma popに失敗しました。スタックが空です。");
+                                        } else {
+                                            Settings.PackSize = Settings.PackSizeStack.Pop();
+                                        }
+                                        break;
+
+                                }
                             }
                             goto rescan;
                         }
@@ -1371,21 +1398,6 @@ namespace AnsiCParser {
             // トークンを読み取った結果、行頭以外になるので先に行頭フラグを倒しておく
             _beginOfLine = false;
 
-            // 識別子の読み取り
-            if (IsIdentifierHead(Peek())) {
-                while (IsIdentifierBody(Peek())) {
-                    IncPos(1);
-                }
-                var end = GetCurrentLocationWithInputPos();
-                var str = Substring(start.Item2, end.Item2);
-                Token.TokenKind kind;
-                if (_reserveWords.TryGetValue(str, out kind)) {
-                    _tokens.Add(new Token(kind, start.Item1, end.Item1, str));
-                } else {
-                    _tokens.Add(new Token(Token.TokenKind.IDENTIFIER, start.Item1, end.Item1, str));
-                }
-                return;
-            }
 
             // 前処理数の読み取り
             if ((Peek(0) == '.' && IsDigit(Peek(1))) || IsDigit(Peek(0))) {
@@ -1456,7 +1468,21 @@ namespace AnsiCParser {
                         _tokens.Add(new Token(Token.TokenKind.STRING_CONSTANT, start.Item1, end.Item1, str));
                         return;
                     } else {
-                        CharIterator(GetCurrentLocation(), () => Peek(), () => IncPos(1), (b) => { });
+                        CharIterator(GetCurrentLocation(), () => Peek(), () => IncPos(1), (b) => { }, (bs) => { return new byte[0]; });
+                    }
+                }
+                throw new Exception();
+            } else if (Peek("L'")) {
+                IncPos(1);
+                while (_inputPos < _inputText.Length) {
+                    if (Peek('\'')) {
+                        IncPos(1);
+                        var end = GetCurrentLocationWithInputPos();
+                        var str = Substring(start.Item2, end.Item2);
+                        _tokens.Add(new Token(Token.TokenKind.WIDESTRING_CONSTANT, start.Item1, end.Item1, str));
+                        return;
+                    } else {
+                        CharIterator(GetCurrentLocation(), () => Peek(), () => IncPos(1), (b) => { }, (bs) => { return new byte[0]; });
                     }
                 }
                 throw new Exception();
@@ -1465,6 +1491,7 @@ namespace AnsiCParser {
             // 文字列リテラルの読み取り
             // todo : wide char / unicode char
             if (Peek('"')) {
+                // マルチバイト文字列
                 IncPos(1);
                 while (_inputPos < _inputText.Length) {
                     if (Peek('"')) {
@@ -1474,12 +1501,42 @@ namespace AnsiCParser {
                         _tokens.Add(new Token(Token.TokenKind.STRING_LITERAL, start.Item1, end.Item1, str));
                         return;
                     } else {
-                        CharIterator(GetCurrentLocation(), () => Peek(), () => IncPos(1), (b) => { });
+                        CharIterator(GetCurrentLocation(), () => Peek(), () => IncPos(1), (b) => { }, (bs) => { return new byte[0]; });
+                    }
+                }
+                throw new Exception();
+            } else if (Peek("L\"")) {
+                // ワイド文字列
+                IncPos(2);
+                while (_inputPos < _inputText.Length) {
+                    if (Peek('"')) {
+                        IncPos(1);
+                        var end = GetCurrentLocationWithInputPos();
+                        var str = Substring(start.Item2, end.Item2);
+                        _tokens.Add(new Token(Token.TokenKind.WIDESTRING_LITERAL, start.Item1, end.Item1, str));
+                        return;
+                    } else {
+                        CharIterator(GetCurrentLocation(), () => Peek(), () => IncPos(1), (b) => { }, (bs) => { return new byte[0]; });
                     }
                 }
                 throw new Exception();
             }
 
+            // 識別子の読み取り
+            if (IsIdentifierHead(Peek())) {
+                while (IsIdentifierBody(Peek())) {
+                    IncPos(1);
+                }
+                var end = GetCurrentLocationWithInputPos();
+                var str = Substring(start.Item2, end.Item2);
+                Token.TokenKind kind;
+                if (_reserveWords.TryGetValue(str, out kind)) {
+                    _tokens.Add(new Token(kind, start.Item1, end.Item1, str));
+                } else {
+                    _tokens.Add(new Token(Token.TokenKind.IDENTIFIER, start.Item1, end.Item1, str));
+                }
+                return;
+            }
             // 区切り子の読み取り
             {
                 foreach (var sym in _symbols) {

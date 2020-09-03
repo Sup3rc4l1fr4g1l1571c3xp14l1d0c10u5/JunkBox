@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Text;
 using AnsiCParser.DataType;
 
 namespace AnsiCParser.SyntaxTree {
@@ -287,7 +288,7 @@ namespace AnsiCParser.SyntaxTree {
                         }
                     }
 
-                    public CharacterConstant(LocationRange locationRange, string str) : base(locationRange) {
+                    public CharacterConstant(LocationRange locationRange, string str, bool isWide) : base(locationRange) {
                         Str = str;
                         // 6.4.4.4 文字定数
                         // 意味規則  単純文字定数は，型 int をもつ。
@@ -295,7 +296,11 @@ namespace AnsiCParser.SyntaxTree {
 
                         int[] i = { 1 };
                         int value = 0;
-                        Lexer.CharIterator(locationRange.Start, () => str[i[0]], () => i[0]++, b => value = (value << 8) | b);
+                        if (isWide) {
+                            Lexer.CharIterator(locationRange.Start, () => str[i[0]], () => i[0]++, b => value = b[0], ch => Encoding.UTF32.GetBytes(new[] { (char)ch }));
+                        } else {
+                            Lexer.CharIterator(locationRange.Start, () => str[i[0]], () => i[0]++, b => value = b[0], ch => Encoding.GetEncoding(932).GetBytes(new[] { (char)ch }));
+                        }
                         Value = (sbyte)value;
                     }
 
@@ -349,7 +354,21 @@ namespace AnsiCParser.SyntaxTree {
                     get;
                 }
 
-                public List<byte> Value { get; }
+                private List<byte> Value { get; }
+
+
+                public bool IsWide() {
+                    return ((ArrayType)ConstantType).ElementType.IsWideCharacterType();
+                }
+                public int Length { get { return ((ArrayType)ConstantType).Length; } }
+                public int GetValue(int i) { 
+                    if (IsWide()) {
+                        return BitConverter.ToInt32(new[] { Value[i * 4 + 0], Value[i * 4 + 1] , Value[i * 4 + 2] , Value[i * 4 + 3] }, 0);
+                    } else {
+                        return Value[i];
+                    }
+                }
+
                 public string Label { get; }
 
                 private CType ConstantType {
@@ -367,24 +386,51 @@ namespace AnsiCParser.SyntaxTree {
                     return true;
                 }
 
-                public StringExpression(LocationRange locationRange, string label, List<string> strings) : base(locationRange) {
-                    // Todo: WideChar未対応
+                public StringExpression(LocationRange locationRange, string label, List<string> strings, bool isWide) : base(locationRange) {
+                    if (isWide == false) {
 
-                    // ascii 
-                    Label = label;
-                    Value = new List<byte>();
-                    var strParts = new List<string>();
-                    foreach (var str in strings) {
-                        int[] i = { 1 };
-                        while (str[i[0]] != '"') {
-                            Lexer.CharIterator(locationRange.Start, () => str[i[0]], () => i[0]++, b => Value.Add(b));
+                        // ascii 
+                        Label = label;
+                        Value = new List<byte>();
+                        var strParts = new List<string>();
+                        var enc = Encoding.GetEncoding(932);
+                        foreach (var str in strings) {
+                            int[] i = { 1 };
+                            while (str[i[0]] != '"') {
+                                Lexer.CharIterator(locationRange.Start, () => str[i[0]], () => i[0]++, b => Value.AddRange(b), ch => { return enc.GetBytes(new[] { (char)ch });  });
+                            }
+                            strParts.Add(str.Substring(1, i[0] - 1));
                         }
-                        strParts.Add(str.Substring(1, i[0] - 1));
-                    }
-                    Value.Add(0x00);
+                        Value.Add(0x00);
 
-                    Strings = strParts;
-                    ConstantType = CType.CreateArray(Value.Count, CType.CreateChar());
+                        Strings = strParts;
+                        ConstantType = CType.CreateArray(Value.Count, CType.CreateMultiByteChar());
+                    } else {
+                        // wide 
+                        Label = label;
+                        Value = new List<byte>();
+                        var strParts = new List<string>();
+                        var enc = Encoding.UTF32;
+                        foreach (var str in strings) {
+                            int[] i = { 2 };
+                            while (str[i[0]] != '"') {
+                                Lexer.CharIterator(locationRange.Start, () => str[i[0]], () => i[0]++, b => Value.AddRange(b), ch => { return enc.GetBytes(new[] { (char)ch }); });
+                            }
+                            strParts.Add(str.Substring(2, i[0] - 1));
+                        }
+                        Value.Add(0x00);
+                        Value.Add(0x00);
+                        Value.Add(0x00);
+                        Value.Add(0x00);
+
+                        Strings = strParts;
+                        ConstantType = CType.CreateArray(Value.Count/4, CType.CreateWideChar());
+
+                    }
+                }
+
+                public byte[] GetBytes() {
+                    return Value.ToArray();
                 }
             }
 

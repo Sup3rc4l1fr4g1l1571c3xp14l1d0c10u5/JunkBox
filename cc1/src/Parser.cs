@@ -73,7 +73,7 @@ namespace AnsiCParser {
         }
 
         /// <summary>
-        ///  暗黙的関数宣言を挿入
+        /// 現在のブロックの宣言部に暗黙的関数宣言を挿入
         /// </summary>
         /// <param name="ident"></param>
         /// <param name="type"></param>
@@ -103,7 +103,7 @@ namespace AnsiCParser {
 
         public Parser(string source, string fileName = "<built-in>") {
             _lexer = new Lexer(source, fileName);
-
+            /*組み込み型や組み込み関数については暫定的にここで追加している*/
             _identScope.Add("__builtin_va_list",
                 new Declaration.TypeDeclaration(
                     LocationRange.Builtin,
@@ -613,7 +613,7 @@ namespace AnsiCParser {
         /// </summary>
         /// <returns></returns>
         private bool IsCharacterConstant() {
-            return _lexer.CurrentToken().Kind == Token.TokenKind.STRING_CONSTANT;
+            return _lexer.CurrentToken().Kind == Token.TokenKind.STRING_CONSTANT || _lexer.CurrentToken().Kind == Token.TokenKind.WIDESTRING_CONSTANT;
         }
 
         /// <summary>
@@ -626,7 +626,7 @@ namespace AnsiCParser {
             }
             var token = _lexer.CurrentToken();
             _lexer.NextToken();
-            return new Expression.PrimaryExpression.Constant.CharacterConstant(token.Range, token.Raw);
+            return new Expression.PrimaryExpression.Constant.CharacterConstant(token.Range, token.Raw, token.Kind == Token.TokenKind.WIDESTRING_CONSTANT);
         }
 
         /// <summary>
@@ -635,6 +635,7 @@ namespace AnsiCParser {
         /// <returns></returns>
         private bool IsStringLiteral() {
             return _lexer.CurrentToken().Kind == Token.TokenKind.STRING_LITERAL;
+            //|| _lexer.CurrentToken().Kind == Token.TokenKind.WIDESTRING_LITERAL;
         }
 
         /// <summary>
@@ -649,8 +650,28 @@ namespace AnsiCParser {
             _lexer.NextToken();
             return ret;
         }
+        /// <summary>
+        /// 6.4.5 ワイド文字列リテラルとなりうるか？
+        /// </summary>
+        /// <returns></returns>
+        private bool IsWideStringLiteral() {
+            return _lexer.CurrentToken().Kind == Token.TokenKind.WIDESTRING_LITERAL;
+        }
 
-#endregion
+
+        /// <summary>
+        /// 6.4.5 文字列リテラル
+        /// </summary>
+        /// <returns></returns>
+        private string WideStringLiteral() {
+            if (IsWideStringLiteral() == false) {
+                throw new CompilerException.SyntaxErrorException(_lexer.CurrentToken().Range, $"ワイド文字列リテラルがあるべき場所に {_lexer.CurrentToken().Raw } があります。");
+            }
+            var ret = _lexer.CurrentToken().Raw;
+            _lexer.NextToken();
+            return ret;
+        }
+        #endregion
 
 
         /// <summary>
@@ -1282,6 +1303,7 @@ namespace AnsiCParser {
             return _lexer.PeekToken(Token.TokenKind.STRUCT, Token.TokenKind.UNION);
         }
 
+
         /// <summary>
         /// 6.7.2.1 構造体指定子及び共用体指定子（構造体共用体指定子）
         /// </summary>
@@ -1294,10 +1316,12 @@ namespace AnsiCParser {
             // デフォルトのパックサイズを取得
             var packSize = Settings.PackSize;
             var alignSize = Settings.AlignSize;
-            // gcc extention option
+            var structLayoutMode = TaggedType.StructUnionType.LayoutMode.Default;
+
+            // gcc extention option (どうやら__attribute__はStorageClassSpecifierに属するみたいなので後で修正)
             {
                 Token t;
-                if (_lexer.PeekToken(out t, Token.TokenKind.IDENTIFIER) && t.Raw == @"__attribute__") {
+                while (_lexer.PeekToken(out t, Token.TokenKind.IDENTIFIER) && t.Raw == @"__attribute__") {
                     _lexer.ReadToken(Token.TokenKind.IDENTIFIER);
                     _lexer.ReadToken('(');
                     _lexer.ReadToken('(');
@@ -1313,6 +1337,14 @@ namespace AnsiCParser {
                             var constant = IntegerConstant();
                             alignSize = (int)constant.Value;
                             _lexer.ReadToken(')');
+                        } else if (_lexer.PeekToken(out t2, Token.TokenKind.IDENTIFIER) && t2.Raw == @"gcc_struct") {
+                            // gcc型の構造体レイアウトを採用
+                            _lexer.ReadToken(Token.TokenKind.IDENTIFIER);
+                            structLayoutMode = TaggedType.StructUnionType.LayoutMode.PCC;
+                        } else if (_lexer.PeekToken(out t2, Token.TokenKind.IDENTIFIER) && t2.Raw == @"ms_struct") {
+                            // msvc型の構造体レイアウトを採用
+                            _lexer.ReadToken(Token.TokenKind.IDENTIFIER);
+                            structLayoutMode = TaggedType.StructUnionType.LayoutMode.MSVC;
                         }
                         if (_lexer.ReadTokenIf(',')) {
                             continue;
@@ -1321,10 +1353,9 @@ namespace AnsiCParser {
                             break;
                         }
                     }
-                _lexer.ReadToken(')');
+                    _lexer.ReadToken(')');
                 }
             }
-            // msvc style option
 
             // 識別子の有無で分岐
             if (IsIdentifier(true)) {
@@ -1343,7 +1374,7 @@ namespace AnsiCParser {
                         if (taggedType != null && isCurrent == false) {
                             Logger.Warning(token.Range, $"構造体/共用体 タグ名 {ident} の宣言は外側のスコープで宣言されている同じタグ名の宣言を隠します。");
                         }
-                        structUnionType = new TaggedType.StructUnionType(kind, ident, false, packSize, alignSize);
+                        structUnionType = new TaggedType.StructUnionType(kind, ident, false, packSize, alignSize, structLayoutMode);
                         _tagScope.Add(ident, structUnionType);
                         AddImplicitTypeDeclaration(token, structUnionType);
                     } else if (!(taggedType is TaggedType.StructUnionType)) {
@@ -1366,7 +1397,7 @@ namespace AnsiCParser {
                     TaggedType taggedType;
                     if (_tagScope.TryGetValue(ident, out taggedType) == false) {
                         // タグ名前表に無い場合は新しく追加する。
-                        taggedType = new TaggedType.StructUnionType(kind, ident, false, packSize, alignSize);
+                        taggedType = new TaggedType.StructUnionType(kind, ident, false, packSize, alignSize, structLayoutMode);
                         _tagScope.Add(ident, taggedType);
                         AddImplicitTypeDeclaration(token, taggedType);
                     } else if (!(taggedType is TaggedType.StructUnionType)) {
@@ -1384,7 +1415,7 @@ namespace AnsiCParser {
                 var ident = $"${kind}_{_anonymousNameCounter++}";
 
                 // 型情報を生成する
-                var structUnionType = new TaggedType.StructUnionType(kind, ident, true, packSize, alignSize);
+                var structUnionType = new TaggedType.StructUnionType(kind, ident, true, packSize, alignSize, structLayoutMode);
 
                 // タグ名前表に追加する
                 _tagScope.Add(ident, structUnionType);
@@ -2495,7 +2526,7 @@ namespace AnsiCParser {
                     var tok = new Token(Token.TokenKind.IDENTIFIER, LocationRange.Builtin.Start, LocationRange.Builtin.End, "__func__");
                     var tyConstStr = new TypeQualifierType(new PointerType(new TypeQualifierType(CType.CreateChar(), DataType.TypeQualifier.Const)), DataType.TypeQualifier.Const);
                     var varDecl = new Declaration.VariableDeclaration(LocationRange.Builtin, "__func__", tyConstStr, AnsiCParser.StorageClassSpecifier.Static);
-                    var initExpr = new SyntaxTree.Expression.PrimaryExpression.StringExpression(LocationRange.Empty, AllocStringLabel(), new List<string> { "\"" + funcName + "\"" });
+                    var initExpr = new SyntaxTree.Expression.PrimaryExpression.StringExpression(LocationRange.Empty, AllocStringLabel(), new List<string> { "\"" + funcName + "\"" },false);
                     varDecl.Init = new Initializer.ConcreteInitializer(LocationRange.Builtin, initExpr.Type, new Initializer.SimpleInitializer(LocationRange.Builtin,initExpr), new[] { new InitializeCommand() { path = new[] { new TyNav.PathPart(tyConstStr,-1) }, expr = initExpr } });
                     //varDecl.Init = new Initializer.SimpleInitializer(LocationRange.Builtin, initExpr);
 
@@ -2812,6 +2843,40 @@ namespace AnsiCParser {
         /// <returns></returns>
         private Expression PrimaryExpression() {
             var start = _lexer.CurrentToken().Start;
+
+            if (IsConstant()) {
+                return Constant();
+            }
+            if (IsStringLiteral()||IsWideStringLiteral()) {
+                List<string> strings = new List<string>();
+                bool hasMultiByte = false;
+                bool hasWide = false;
+                while (IsStringLiteral() || IsWideStringLiteral()) {
+                    if (IsWideStringLiteral()) {
+                        if (hasMultiByte == true && hasWide == false) {
+                            // 翻訳フェーズ（6）において，隣り合う単純文字列リテラル字句又はワイド文字列リテラル字句で指定される多バイト文字の並びは，連結して一つの多バイト文字の並びになる。
+                            // 字句のいずれかがワイド文字列リテラルである場合，結果として生じる多バイト文字の並びは，ワイド文字列リテラルとして扱う。
+                            // それ以外の場合，それは単純文字列リテラルとして扱う。
+                            // 文字の種類が異なるリテラル文字列は連結できません
+                            Logger.Warning(_lexer.CurrentToken().Range, "ワイド文字列リテラルと単純文字列リテラルが隣り合っているため、連結されてワイド文字列リテラルになります。");
+                        }
+                        hasWide = true;
+                        strings.Add(WideStringLiteral());
+                    } else if (IsStringLiteral()) {
+                        if (hasMultiByte == false && hasWide == true) {
+                            // 翻訳フェーズ（6）において，隣り合う単純文字列リテラル字句又はワイド文字列リテラル字句で指定される多バイト文字の並びは，連結して一つの多バイト文字の並びになる。
+                            // 字句のいずれかがワイド文字列リテラルである場合，結果として生じる多バイト文字の並びは，ワイド文字列リテラルとして扱う。
+                            // それ以外の場合，それは単純文字列リテラルとして扱う。
+                            // 文字の種類が異なるリテラル文字列は連結できません
+                            Logger.Warning(_lexer.CurrentToken().Range, "ワイド文字列リテラルと単純文字列リテラルが隣り合っているため、連結されてワイド文字列リテラルになります。");
+                        }
+                        hasMultiByte = true;
+                        strings.Add(StringLiteral());
+                    }
+                }
+                var end = _lexer.CurrentToken().End;
+                return new Expression.PrimaryExpression.StringExpression(new LocationRange(start, end), AllocStringLabel(), strings, hasWide);
+            }
             if (IsIdentifier(false)) {
                 var ident = Identifier(false);
                 Declaration value;
@@ -2833,17 +2898,7 @@ namespace AnsiCParser {
                 }
                 throw new CompilerException.InternalErrorException(_lexer.CurrentToken().Range, $"一次式として使える定義済み識別子は変数、列挙定数、関数のいずれかですが、 { _lexer.CurrentToken().Raw } はそのいずれでもありません。（本処理系の実装に誤りがあると思います。）");
             }
-            if (IsConstant()) {
-                return Constant();
-            }
-            if (IsStringLiteral()) {
-                List<string> strings = new List<string>();
-                while (IsStringLiteral()) {
-                    strings.Add(StringLiteral());
-                }
-                var end = _lexer.CurrentToken().End;
-                return new Expression.PrimaryExpression.StringExpression(new LocationRange(start, end), AllocStringLabel(), strings);
-            }
+
             if (_lexer.ReadTokenIf('(')) {
                 if (_lexer.PeekToken('{')) {
                     // gcc statement expression

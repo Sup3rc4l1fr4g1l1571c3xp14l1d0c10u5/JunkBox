@@ -320,6 +320,14 @@ namespace AnsiCParser {
         }
 
         /// <summary>
+        /// ワイド文字型（wchar_t）ならば真
+        /// </summary>
+        /// <returns></returns>
+        public static bool IsWideCharacterType(this CType self) {
+            return self.IsBasicType(BasicType.TypeKind.SignedInt , BasicType.TypeKind.UnsignedInt);
+        }
+
+        /// <summary>
         /// 列挙型（enumerated type）ならば真
         /// </summary>
         /// <returns></returns>

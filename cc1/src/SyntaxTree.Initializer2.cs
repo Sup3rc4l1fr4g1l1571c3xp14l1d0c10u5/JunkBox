@@ -791,6 +791,10 @@ namespace AnsiCParser.SyntaxTree {
                         stack.Add(ty.getStack());
                         expr.next();
                     } else if (ty.isArrayType()) {
+                        CType elementType;
+                        int len;
+                        System.Diagnostics.Debug.Assert(ty.current.IsArrayType(out elementType, out len));
+                        if (len == -1 && ty.parent != null) { throw new Exception("variable array legvel"); }
                         exprEnter.Push(true);
                         ty.enterArray();
                         stack.Add(ty.getStack());
@@ -834,24 +838,33 @@ namespace AnsiCParser.SyntaxTree {
                         continue;
                     } else if (ty.isArrayType()) {
                         var tyArray = ty.current.Unwrap() as ArrayType;
+                        {
+                            CType elementType;
+                            int len;
+                            System.Diagnostics.Debug.Assert(ty.current.IsArrayType(out elementType, out len));
+                            if (len == -1 && ty.getPath().Length > 1) { throw new Exception("variable array legvel"); }
+                        }
                         if (currentExpr is Initializer.SimpleInitializer) {
                             if ((currentExpr as Initializer.SimpleInitializer).AssignmentExpression is Expression.PrimaryExpression.StringExpression) {
                                 var sexpr = (currentExpr as Initializer.SimpleInitializer).AssignmentExpression as Expression.PrimaryExpression.StringExpression;
-                                if (tyArray.ElementType.IsCharacterType() == false) {
-                                    throw new CompilerException.SpecificationErrorException(currentExpr.LocationRange, $"char型の文字列リテラルで{tyArray.ElementType.ToString()}型の配列は初期化できません。");
-                                }
-                                if (tyArray.Length == -1) {
-                                    tyArray.Length = sexpr.Value.Count;
-                                } else {
-                                    var len = Math.Min(tyArray.Length, sexpr.Value.Count);
-                                    if (tyArray.Length + 1 == sexpr.Value.Count) {
-                                        Logger.Warning(currentExpr.LocationRange, "末尾のヌル文字は切り捨てられます。これが意図した動作でない場合は修正を行ってください。");
-                                    } else if (tyArray.Length < sexpr.Value.Count) {
-                                        Logger.Warning(currentExpr.LocationRange, "char配列の初期化文字列が長すぎます。");
+                                if (sexpr.IsWide() == false) {
+                                    if (tyArray.ElementType.IsCharacterType() == false) {
+                                        throw new CompilerException.SpecificationErrorException(currentExpr.LocationRange, $"char型の文字列リテラルで{tyArray.ElementType.ToString()}型の配列は初期化できません。");
+                                    }
+                                    var len = 0;
+                                    if (tyArray.Length == -1) {
+                                        len = tyArray.Length = sexpr.Length;
+                                    } else {
+                                        len = Math.Min(tyArray.Length, sexpr.Length);
+                                        if (tyArray.Length + 1 == sexpr.Length) {
+                                            Logger.Warning(currentExpr.LocationRange, "末尾のヌル文字は切り捨てられます。これが意図した動作でない場合は修正を行ってください。");
+                                        } else if (tyArray.Length < sexpr.Length) {
+                                            Logger.Warning(currentExpr.LocationRange, "char配列の初期化文字列が長すぎます。");
+                                        }
                                     }
                                     ty.enterArray();
                                     for (var i = 0; i < len; i++) {
-                                        byte ch = sexpr.Value[i];
+                                        var ch = sexpr.GetValue(i);
                                         var chExpr = new Expression.PrimaryExpression.Constant.IntegerConstant(currentExpr.LocationRange, "", ch, BasicType.TypeKind.Char);
                                         var assign = Expression.AssignmentExpression.SimpleAssignmentExpression.ApplyAssignmentRule(currentExpr.LocationRange, tyArray.ElementType, chExpr);
                                         ret.Add(new InitializeCommand() { path = ty.getPath(), expr = chExpr });
@@ -860,8 +873,33 @@ namespace AnsiCParser.SyntaxTree {
                                     ty.leave();
                                     ty.next();
                                     expr.next();
+                                } else {
+                                    if (tyArray.ElementType.IsWideCharacterType() == false) {
+                                        throw new CompilerException.SpecificationErrorException(currentExpr.LocationRange, $"wchar_t型の文字列リテラルで{tyArray.ElementType.ToString()}型の配列は初期化できません。");
+                                    }
+                                    var len = 0;
+                                    if (tyArray.Length == -1) {
+                                        len = tyArray.Length = sexpr.Length;
+                                    } else {
+                                        len = Math.Min(tyArray.Length, sexpr.Length);
+                                        if (tyArray.Length + 1 == sexpr.Length) {
+                                            Logger.Warning(currentExpr.LocationRange, "末尾のヌル文字は切り捨てられます。これが意図した動作でない場合は修正を行ってください。");
+                                        } else if (tyArray.Length < sexpr.Length) {
+                                            Logger.Warning(currentExpr.LocationRange, "wchar_t配列の初期化文字列が長すぎます。");
+                                        }
+                                    }
+                                    ty.enterArray();
+                                    for (var i = 0; i < len; i++) {
+                                        var ch = sexpr.GetValue(i);
+                                        var chExpr = new Expression.PrimaryExpression.Constant.IntegerConstant(currentExpr.LocationRange, "", ch, BasicType.TypeKind.SignedInt);
+                                        var assign = Expression.AssignmentExpression.SimpleAssignmentExpression.ApplyAssignmentRule(currentExpr.LocationRange, tyArray.ElementType, chExpr);
+                                        ret.Add(new InitializeCommand() { path = ty.getPath(), expr = chExpr });
+                                        ty.next();
+                                    }
+                                    ty.leave();
+                                    ty.next();
+                                    expr.next();
                                 }
-
                             } else {
                                 ty.enterArray();
                                 exprEnter.Push(false);

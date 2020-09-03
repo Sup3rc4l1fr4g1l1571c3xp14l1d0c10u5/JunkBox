@@ -34,7 +34,7 @@ namespace AnsiCParser {
             /// </summary>
             /// <returns></returns>
             public override int SizeOf() {
-                return SizeOf(BasicType.TypeKind.SignedInt);
+                return SizeOf(BasicType.TypeKind.__Pointer);
             }
 
             /// <summary>
@@ -42,7 +42,7 @@ namespace AnsiCParser {
             /// </summary>
             /// <returns></returns>
             public override int AlignOf() {
-                return AlignOf(BasicType.TypeKind.SignedInt);
+                return AlignOf(BasicType.TypeKind.__Pointer);
             }
 
         }

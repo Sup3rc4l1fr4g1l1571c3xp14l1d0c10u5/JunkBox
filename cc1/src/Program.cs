@@ -10,14 +10,9 @@ namespace AnsiCParser {
     class Program {
 
         static void Main(string[] args) {
-
-            //
-            // I Do Not Know C. 
-            //
             if (!Debugger.IsAttached) {
                 CommonMain(args);
             } else {
-//                CommonMain(args);
                 DebugMain(args);
             }
         }
@@ -41,8 +36,6 @@ namespace AnsiCParser {
                 // check input source
                 if (Args.Length == 0) {
                     act("コンパイル対象のCソースファイルを１つ指定してください。");
-                //} else if (Args.Length > 1) {
-                //    act("コンパイル対象のCソースファイルが２つ以上指定されています。");
                 } else {
                     foreach (var arg in Args) {
                         if (System.IO.File.Exists(arg) == false) {
@@ -60,6 +53,7 @@ namespace AnsiCParser {
         }
 
         static void CommonMain(string[] args) {
+            // コマンドラインオプションの解析
             var opts = new CommandLineOptionsParser<CommandLineOptions>()
                 .Entry(@"-o", 1, (t, s) => {
                     t.OutputFile = s[0];
@@ -137,32 +131,7 @@ namespace AnsiCParser {
             var ret = new Parser(
                 System.IO.File.ReadAllText(@"C:\Users\whelp\Desktop\cc1\TestCase\tcc\tmp\95_bitfields.i") /*
                 @"
-typedef long unsigned int size_t;
-
-int printf (const char*, ...);
-void *memset (void*, int, size_t);
-
-
-void dump(void *p, int s)
-{
-    int i;
-    for (i = s; --i >= 0;)
-        printf(""%02X"", ((unsigned char*)p)[i]);
-    printf(""\n"");
-}
-
-#pragma pack(1)
-
-int top = 1;
-
-int main(void) {
-
-    struct __s
-    {
-        unsigned x:5, y:5, :0, z:5; char a:5; short b:5;
-    };
-    return 0;
-}
+short ws[] = L""あいうえお"";
 
 
 "//*/

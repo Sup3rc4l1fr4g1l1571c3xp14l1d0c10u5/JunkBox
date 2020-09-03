@@ -66,6 +66,7 @@ namespace AnsiCParser {
             //TYPE_NAME,
             // Constants
             STRING_CONSTANT,
+            WIDESTRING_CONSTANT,
             HEXIMAL_CONSTANT,
             OCTAL_CONSTANT,
             DECIAML_CONSTANT,
@@ -73,6 +74,7 @@ namespace AnsiCParser {
             DOUBLE_CONSTANT,
             // StringLiteral
             STRING_LITERAL,
+            WIDESTRING_LITERAL,
             // Symbols
             ELLIPSIS,
             RIGHT_ASSIGN,
